@@ -1,0 +1,49 @@
+void initCustomLogs() {
+    customLogCount = 0;
+    int i_offset = 0;
+
+    for (int row = 0; row < CELLS_Y; row++) {
+        RowSettings* rs = &editor.rowSettings[row];
+        if (rs->objectType != OBJ_LOG) continue;
+
+        float cellW = GAME_WIDTH / CELLS_X;
+        float y = row * (HEIGHT / CELLS_Y);
+        float logWidth = cellW * rs->length; // Ширина бревна в клетках
+        float rightBoundary = GAME_WIDTH;
+
+        // Вычисляем базовое расстояние между машинами
+        float baseSpace = (float)GAME_WIDTH / (float)rs->quantity;
+
+        // Размещаем машины
+        float prevX = -baseSpace;
+        for (int j = 0; j < rs->quantity && customLogCount < MAX_CUSTOM_OBJS; j++) {
+            CustomObject* log = &customLogs[customLogCount];
+
+            // Вычисляем позицию с рандомным смещением
+            float randomOffset = (j != 0) ? (rand() % (int)(baseSpace * 100)) / 100.0f - baseSpace / 2 : 0;
+
+            log->x = prevX + baseSpace + ((j != 0) ? logWidth : 0) + randomOffset;
+            prevX = log->x;
+            log->y = y;
+            log->startX = log->x;
+            log->startY = log->y;
+            log->speed = rs->initialSpeed1;
+            log->direction = rs->direction;
+            log->row = row;
+            log->width = logWidth;
+            log->texture = logMTex; // Основная текстура бревна
+            log->hitbox = (Hitbox){ .left = 0.05f, .right = 0.05f, .top = 0.05f, .bottom = 0.05f };
+
+            rightBoundary = (rightBoundary > log->x) ? rightBoundary : log->x;
+
+            customLogCount++;
+        }
+        // присваиваем каждому бревну rightBoundary
+        for (int i = 0; i < rs->quantity && customLogCount < MAX_CUSTOM_OBJS; i++) {
+            CustomObject* log = &customLogs[i + i_offset];
+            log->rightBoundary = rightBoundary;
+        }
+        i_offset = customLogCount;
+    }
+}
+

@@ -1,0 +1,4085 @@
+#include <glew.h>
+#include <glfw3.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#include <time.h>
+#include <glut.h>
+#include <cJSON.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
+
+#define PI 3.14159265358979323846 // pi
+#define PI_2 1.57079632679489661923   // pi/2
+
+const int WIDTH = 1600;
+const int INFO_WIDTH = 400;
+const int GAME_WIDTH = 1200;
+const int HEIGHT = 900;
+const int CELLS_Y = 15;
+const int CELLS_X = 20;
+
+float deltaTime = 0.0f;
+float lastFrameTime = 0.0f;
+#define MOVE_SPEED 600.0f
+
+int currentLevel = 1; // Текущий уровень
+int completedHomes = 0; // Количество заполненных домиков
+
+#define MAX_OBSTACLES_PER_ROW 15  // Максимальное количество объектов в ряду
+#define CAR_ROWS 5          // Количество рядов с машинами
+#define LOG_ROWS 3                // Количество рядов с бревнами
+#define TURTLE_ROWS 2             // Количество рядов с черепахами
+
+int carsPerRow[CAR_ROWS] = { 2, 3, 2, 3, 1 };
+int logsPerRow[LOG_ROWS] = { 2, 3, 4 };
+int turtlesPerRow[TURTLE_ROWS] = { 4, 3 };
+
+float carSpeeds[CAR_ROWS] = { 50.0f, 70.0f, 85.0f, 100.0f, 75.0f };
+float logSpeeds[LOG_ROWS] = { 35.0f, 80.0f, 40.0f };
+float turtleSpeeds[TURTLE_ROWS] = { 60.0f, 45.0f };
+float snakeSpeed = 50.0f;
+float lawnmower1Speed = 80.0f;
+float lawnmower2Speed = 200.0f;
+
+int baseCarsPerRow[CAR_ROWS] = { 2, 3, 2, 3, 1 };
+int baseLogsPerRow[LOG_ROWS] = { 2, 3, 4 };
+int baseTurtlesPerRow[TURTLE_ROWS] = { 4, 3 };
+
+float baseCarSpeeds[CAR_ROWS] = { 50.0f, 70.0f, 85.0f, 100.0f, 75.0f };
+float baseLogSpeeds[LOG_ROWS] = { 35.0f, 80.0f, 40.0f };
+float baseTurtleSpeeds[TURTLE_ROWS] = { 60.0f, 45.0f };
+float baseSnakeSpeed = 50.0f;
+float baseLawnmower1Speed = 80.0f;
+float baseLawnmower2Speed = 140.0f;
+
+#define MAX_HOMES_COUNT 5  // Количество домиков
+int homes_count = 0;
+
+#define MIN_SPACE (GAME_WIDTH / CELLS_X)
+
+#define SCORE_HOME 100
+#define SCORE_FORWARD 10
+
+#define HITBOX_LEFT   0
+#define HITBOX_RIGHT  1
+#define HITBOX_TOP    2
+#define HITBOX_BOTTOM 3
+
+#define MIN_CELLS 2
+#define MAX_CELLS_X 30
+#define MAX_CELLS_Y 30
+
+#define ALLIGATOR_ROWS 1
+#define ALLIGATOR_ANIM_SPEED 2.0f  // Скорость анимации пасти
+
+#define DEBUG_HITBOX_KEY GLFW_KEY_H  // Клавиша для включения/выключения хитбоксов
+int showHitboxes = 0;                // Флаг отображения хитбоксов
+int hitboxKeyPressed = 0;            // Для отслеживания состояния клавиши H
+#define NOCLIP_KEY GLFW_KEY_N  // Клавиша для включения/выключения noclip
+int noclipEnabled = 0;         // Флаг режима noclip
+int noclipKeyPressed = 0;      // Для отслеживания состояния клавиши
+int levelupKeyPressed = 0;
+int escKeyPressed = 0;
+
+textInputActive = 0;
+
+char levelName[22] = { 0 }; // Буфер для названия уровня
+
+double cursorX, cursorY;
+int isCursorInEditorField = 0;
+
+GLuint backgroundTex;
+GLuint titleTex;
+GLuint playTex;
+GLuint exitTex;
+GLuint frogTex;
+GLuint gameOverTex;
+GLuint restartTex;
+GLuint menuTex;
+GLuint waterTex;
+GLuint car1Tex;
+GLuint car2Tex;
+GLuint car3Tex;
+GLuint car4Tex;
+GLuint truckTex;
+GLuint logLTex;
+GLuint logMTex;
+GLuint logRTex;
+GLuint heartTex;
+GLuint turtle1Tex;  // Черепаха на поверхности
+GLuint turtle2Tex;  // Черепаха наполовину скрыта
+GLuint turtle3Tex;  // Черепаха почти под водой
+GLuint turtle4Tex;  // Черепаха полностью под водой
+GLuint roadTex;      // Текстура дороги
+GLuint groundTex;    // Текстура земли
+GLuint homeEmptyTex;    // Пустой домик
+GLuint homeFill1Tex;    // Анимация заполнения 1
+GLuint homeFill2Tex;    // Анимация заполнения 2
+GLuint homeFill3Tex;    // Анимация заполнения 3
+GLuint homeFullTex;     // Полностью заполненный домик
+GLuint infoPanelTex;
+GLuint gameOverBackgroundTex;
+GLuint menuBackgroundTex;
+GLuint lawnmowerTex;
+GLuint lawnTex;
+GLuint snakeTex;  // Текстура змеи
+GLuint dialogWindowTex;
+GLuint yesButtonTex;
+GLuint noButtonTex;
+GLuint menuPromptTex;
+GLuint menuButtonTex;
+GLuint editorTex;
+GLuint createButtonTex;
+GLuint sliderBarTex;    // Текстура для полоски ползунка
+GLuint sliderHandleTex; // Текстура для бегунка
+GLuint cancelButtonTex;  // Текстура кнопки Cancel
+GLuint alligatorHeadClosedTex;
+GLuint alligatorHeadOpenTex;
+GLuint alligatorBodyTex;
+GLuint alligatorTailTex;
+GLuint optionButtonTex;
+GLuint deleteButtonTex;
+GLuint grassButtonTex;
+GLuint roadButtonTex;
+GLuint lawnButtonTex;
+GLuint waterButtonTex;
+GLuint homeButtonTex;
+GLuint spawnButtonTex;
+GLuint invalidPatternTex;
+GLuint buttonDirectionLeftTex;
+GLuint buttonDirectionRightTex;
+GLuint editorOptionsCar1Tex;
+GLuint editorOptionsCar2Tex;
+GLuint editorOptionsCar3Tex;
+GLuint editorOptionsCar4Tex;
+GLuint editorOptionsLawnmowerTex;
+GLuint editorOptionsLogTex;
+GLuint editorOptionsSnakeTex;
+GLuint editorOptionsMenuTex;
+GLuint editorOptionsTruckTex;
+GLuint editorOptionsTurtleTex;
+GLuint emptyTex;
+GLuint editorOptionsNotAllowedEmpty;
+GLuint editorOptionsNotAllowedOneLawnmower;
+GLuint editorOptionsNotAllowedTwoLawnmowers;
+GLuint editorOptionsNotAllowedRoad;
+GLuint editorOptionsNotAllowedWater;
+GLuint editorOptionsNotAllowedSnake;
+GLuint editorOptionsNotAllowedZeroQuantity;
+GLuint exitButtonTex;
+GLuint resumeButtonTex;
+GLuint saveAndExitButtonTex;
+GLuint saveAndPlayButtonTex;
+GLuint saveButtonTex;
+GLuint levelsTex;
+GLuint inputFieldTex;
+GLuint loadTex;
+GLuint deleteTex;
+
+typedef enum {
+    MAIN_MENU,
+    PLAYING,
+    GAME_OVER,
+    MENU_CONFIRM,
+    LEVEL_CREATE_DIALOG,
+    LEVEL_LOAD_DIALOG,
+    LEVEL_DELETE_CONFIRM,
+    EDITOR,
+    LEVEL_EDITOR_EXIT_DIALOG,
+    LEVELS_MENU,
+    LEVEL_LOAD_ERROR,
+    CUSTOM_PLAYING
+} GameState;
+
+GameState gameState = MAIN_MENU;
+
+typedef enum {
+    OBJ_EMPTY,
+    OBJ_CAR1,
+    OBJ_CAR2,
+    OBJ_CAR3,
+    OBJ_CAR4,
+    OBJ_TRUCK,
+    OBJ_LOG,
+    OBJ_TURTLE,
+    OBJ_SNAKE,
+    OBJ_LAWNMOWER,
+    OBJ_COUNT // Для подсчёта количества типов
+} ObjectType;
+
+ObjectType selectedObjectType = OBJ_EMPTY;
+GLuint objectPreviewTextures[OBJ_COUNT];
+GLuint objectAllowedOptions[OBJ_COUNT];
+
+typedef enum {
+    EDITOR_MODE_NONE,
+    EDITOR_MODE_ZONE,
+    EDITOR_MODE_HOME,
+    EDITOR_MODE_SPAWN,
+    EDITOR_MODE_DELETE,
+    EDITOR_MODE_OPTIONS
+} EditorMode;
+
+EditorMode editorMode = EDITOR_MODE_NONE;
+
+typedef enum {
+    ZONE_NONE,
+    ZONE_GRASS,
+    ZONE_ROAD,
+    ZONE_LAWN,
+    ZONE_WATER
+} ZoneType;
+
+ZoneType selectedZone = ZONE_NONE;
+
+typedef struct {
+    float left;    // % от левого края
+    float right;   // % от правого края 
+    float top;     // % от верхнего края
+    float bottom;  // % от нижнего края
+} Hitbox;
+
+typedef struct {
+    float x, y;
+    int state;          // 0 - пустой, 1-3 - анимация заполнения, 4 - заполнен
+    float animTimer;    // Таймер анимации
+} Home;
+
+typedef struct {
+    float x, y;
+    float startX, startY; // Начальные позиции
+    float speed;
+    int direction; // 1 - вправо, -1 - влево
+    int row; // Номер ряда (например, 8, 9, 10)
+    GLuint texture; // Храним указатель на текстуру
+    float rightBoundary; // Добавляем для хранения правой границы
+    Hitbox hitbox;
+} Car;
+
+typedef struct {
+    float x, y;
+    float speed;
+    int direction;
+    float width; // Ширина бревна (в клетках)
+    float rightBoundary; // Добавляем для хранения правой границы
+    Hitbox hitbox;
+} Log;
+
+typedef struct {
+    float x, y;
+    float speed;
+    int direction;
+    float width;
+    int state;      // 0 - на поверхности, 1 - немного погружена, 2 - почти под водой, 3 - под водой
+    float timer;    // Таймер для смены состояний
+    int phase;      // 0 - перерыв на поверхности, 1 - погружение, 2 - перерыв под водой, 3 - всплытие
+    float phaseTimer; // Таймер текущей фазы
+    int isDiving;   // 1 - если черепаха ныряет, 0 - если нет
+    float rightBoundary; // Добавляем для хранения правой границы
+    Hitbox hitbox;
+} Turtle;
+
+typedef struct {
+    float x, y;
+    float startY;
+    float speed;
+    float baseSpeed; // Базовая скорость (константа)
+    float currentSpeed; // Текущая скорость (может меняться)
+    int direction;
+    GLuint texture;
+    float changeRowTimer;
+    int currentRow;
+    int isChangingRow;
+    float changeRowProgress;
+    float targetY;
+    float rotationAngle;
+    int rotationDirection;
+    float rowChangeSpeedFactor; // Коэффициент скорости смены ряда
+    Hitbox hitbox;
+    int isActive; // 0 - не активна, 1 - активна
+} Lawnmower;
+
+typedef struct {
+    float x, y;
+    float speed;
+    int direction; // 1 - вправо, -1 - влево
+    int row;
+    GLuint texture; // Текстура змеи
+    Hitbox hitbox;
+    int isActive; // 0 - не активна, 1 - активна
+} Snake;
+
+typedef struct {
+    float dv;          // Скорость, которая прибавляется
+    int dvLevels;      // Количество уровней для прибавления скорости dv
+    int dcount;        // Количество объектов, которое прибавляется
+    int dcountLevels;  // Количество уровней для прибавления dcount
+} ObjectState;
+
+// Глобальные состояния для разных типов объектов
+ObjectState carStates[CAR_ROWS] = {
+    {15.0f, 2, 1, 6},  // Для первого ряда машин
+    {100.0f, 4, 1, 10},   // Для второго ряда
+    {10.0f, 3, 1, 5},    // И т.д.
+    {20.0f, 2, 0, 0},
+    {30.0f, 4, 1, 7}
+};
+
+ObjectState logStates[LOG_ROWS] = {
+    {15.0f, 2, 0, 0},
+    {10.0f, 1, 0, 0},
+    {25.0f, 3, 0, 0}
+};
+
+ObjectState turtleStates[TURTLE_ROWS] = {
+    {10.0f, 2, 0, 0},
+    {15.0f, 3, 0, 0}
+};
+
+ObjectState lawnmower1State = { 35.0f, 2, 0, 0 }; // Ускорение на 10 каждые 2 уровня
+ObjectState lawnmower2State = { 40.0f, 3, 0, 0 }; // Ускорение на 10 каждые 2 уровня
+ObjectState snakeState = { 30.0f, 3, 0, 0 };    // Ускорение на 15 каждые 3 уровня
+
+typedef struct {
+    float value;       // Текущее значение (от 0.0 до 1.0)
+    float x, y;       // Позиция
+    float width;      // Ширина ползунка
+    int isDragging;   // Флаг перетаскивания
+} Slider;
+
+// Глобальные переменные для ползунков
+Slider xSizeSlider;
+Slider ySizeSlider;
+int selectedCellsX = 10; // Значение по умолчанию
+int selectedCellsY = 10; // Значение по умолчанию
+Slider* activeSlider = NULL; // Указатель на активный ползунок (NULL если нет активного)
+
+// Структура для хранения звуков
+typedef struct {
+    Mix_Chunk* click;
+    Mix_Chunk* explode;
+    Mix_Chunk* jump;
+    Mix_Chunk* levelup;
+    Mix_Chunk* play;
+    Mix_Chunk* quit;
+    Mix_Music* gameMusic;
+    Mix_Music* menuMusic;
+    Mix_Music* gameOver;
+    Mix_Chunk* error;
+} SoundSystem;
+
+SoundSystem sounds;
+
+typedef struct {
+    ObjectType objectType;
+    int quantity;
+    int length;
+    float initialSpeed1;
+    float initialSpeed2;
+    int speedLevels1;
+    int speedLevels2;
+    float speedIncrease1;
+    float speedIncrease2;
+    int countLevels;
+    int countIncrease;
+    int direction; // 1 - вправо, -1 - влево
+} RowSettings;
+
+typedef struct {
+    int cellsX;         // Количество ячеек по X
+    int cellsY;         // Количество ячеек по Y
+    float cellSize;     // Размер ячейки (квадратные ячейки)
+    float fieldWidth;   // Ширина всего поля
+    float fieldHeight;  // Высота всего поля
+    float viewOffsetX;  // Смещение для центрирования
+    float viewOffsetY;  // Смещение для центрирования
+    float zoomFactor;
+    float panX, panY;    // Смещение камеры
+    float baseCellSize;  // Базовый размер ячейки без зума
+    ZoneType* zoneTypes;
+    int isOptionsMenuOpen;      // 1 если окно открыто
+    int selectedZoneRow;        // Выбранный ряд для настроек
+    float optionsMenuPosX;      // Позиция окна по X
+    float optionsMenuPosY;      // Позиция окна по Y
+    RowSettings* rowSettings;
+} LevelEditor;
+
+LevelEditor editor;
+
+int isDirLeftPressed = 0;
+int isDirRightPressed = 0;
+
+typedef struct {
+    int quantity;      // Значение количества
+    int length;        // Значение длины
+
+    // Начальная скорость
+    float initialSpeed1;
+    float initialSpeed2;
+
+    // Уровней для повышения скорости
+    int speedLevels1;
+    int speedLevels2;
+
+    // Повышение скорости за n уровней
+    float speedIncrease1;
+    float speedIncrease2;
+
+    // Уровней для повышения количества объектов
+    int countLevels;
+
+    // Повышение количества объектов за n уровней
+    int countIncrease;
+
+    // Текущее активное поле ввода
+    int focusedInputField; // 0-нет, 1-10 - соответствуют полям
+    char inputBuffer[32];
+    char prevValue[32];
+    int isValueHidden;
+} EditorOptions;
+
+EditorOptions editorOptions = {
+    .quantity = 0,
+    .length = 2,
+    .initialSpeed1 = 0,
+    .initialSpeed2 = 0,
+    .speedLevels1 = 0,
+    .speedLevels2 = 0,
+    .speedIncrease1 = 0,
+    .speedIncrease2 = 0,
+    .countLevels = 0,
+    .countIncrease = 0,
+    .focusedInputField = 0,
+    .inputBuffer = {0}
+};
+
+
+typedef struct {
+    float x, y;
+    float speed;
+    int direction;
+    float width;
+    float rightBoundary;
+    Hitbox hitbox;       // Основной хитбокс (как у бревна)
+    Hitbox headHitbox;   // Хитбокс головы (смертельная зона)
+    int isActive;
+    int mouthState;      // 0 - закрыта, 1 - открыта
+    float mouthTimer;    // Таймер анимации пасти
+    float mouthProgress; // Прогресс анимации (0-1)
+} Alligator;
+
+typedef struct {
+    float homeX;
+    float homeY;
+    int isHouseExist;
+} HomePositions;
+
+HomePositions homePositions[MAX_HOMES_COUNT] = { -999 }; // Для хранения позиций домиков
+float spawnX = -999, spawnY = -999; // Позиция точки спавна
+
+typedef struct {
+    int keyPressed[GLFW_KEY_LAST + 1]; // Флаги нажатия клавиш
+    double lastKeyPressTime[GLFW_KEY_LAST + 1]; // Время последнего нажатия
+} KeyState;
+
+KeyState keyStateInput = { 0 };
+
+typedef struct {
+    int cellsX, cellsY;
+    float spawnX, spawnY;
+    ZoneType* zoneTypes; // массив размером cellsY
+    HomePositions homes[MAX_HOMES_COUNT];
+    RowSettings* rowSettings; // массив размером cellsY
+} LevelData;
+
+LevelData currentLevelData;
+
+static double lastMouseX, lastMouseY;
+static int isPanning = 0;
+
+
+
+int levelFileExists(const char* filename) {
+    char path[256];
+    snprintf(path, sizeof(path), "levels/%s.json", filename);
+    FILE* file = fopen(path, "r");
+    if (file) {
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
+int getMaxQuantityForObject(ObjectType objType) {
+    switch (objType) {
+    case OBJ_SNAKE:       return 1;
+    case OBJ_LAWNMOWER:   return 2;
+    case OBJ_CAR1:
+    case OBJ_CAR2:
+    case OBJ_CAR3:
+    case OBJ_CAR4:
+    case OBJ_TRUCK:
+    case OBJ_LOG:
+    case OBJ_TURTLE:      return 15;
+    default:              return 0;
+    }
+}
+
+void closeOptionsMenu() {
+    editor.isOptionsMenuOpen = 0;
+    editorOptions.focusedInputField = 0;
+    memset(editorOptions.inputBuffer, 0, sizeof(editorOptions.inputBuffer));
+    isDirLeftPressed = 0;
+    isDirRightPressed = 0;
+}
+
+void saveEditorInputValue() {
+    if (strlen(editorOptions.inputBuffer) == 0) return;
+
+    if (strlen(editorOptions.inputBuffer) > 0) {
+        switch (editorOptions.focusedInputField) {
+        case 1: {
+            editorOptions.quantity = atoi(editorOptions.inputBuffer);
+            int max = getMaxQuantityForObject(selectedObjectType);
+            int min = 0;
+            if (editorOptions.quantity > max) {
+                editorOptions.quantity = max;
+            }
+            else if (editorOptions.quantity < 0) {
+                editorOptions.quantity = 0;
+            }
+            break;
+        }
+        case 2: {
+            editorOptions.length = atoi(editorOptions.inputBuffer);
+            if (editorOptions.length > 5) {
+                editorOptions.length = 5;
+            }
+            else if (selectedObjectType == OBJ_LOG && editorOptions.length < 2) {
+                editorOptions.length = 2;
+            }
+            else if (editorOptions.length < 1) {
+                editorOptions.length = 1;
+            }
+            break;
+        }
+        case 3: {
+            editorOptions.initialSpeed1 = atof(editorOptions.inputBuffer);
+            if (editorOptions.initialSpeed1 > 500.0f) {
+                editorOptions.initialSpeed1 = 500.0f;
+            }
+            break;
+        }
+        case 4: {
+            editorOptions.initialSpeed2 = atof(editorOptions.inputBuffer);
+            if (editorOptions.initialSpeed2 > 500.0f) {
+                editorOptions.initialSpeed2 = 500.0f;
+            }
+            break;
+        }
+        case 5: {
+            editorOptions.speedLevels1 = atoi(editorOptions.inputBuffer);
+            if (editorOptions.speedLevels1 > 20) {
+                editorOptions.speedLevels1 = 20;
+            }
+            break;
+        }
+        case 6: {
+            editorOptions.speedLevels2 = atoi(editorOptions.inputBuffer);
+            if (editorOptions.speedLevels2 > 10) {
+                editorOptions.speedLevels2 = 10;
+            }
+            break;
+        }
+        case 7: {
+            editorOptions.speedIncrease1 = atof(editorOptions.inputBuffer);
+            if (editorOptions.speedIncrease1 > 250.0f) {
+                editorOptions.speedIncrease1 = 250.0f;
+            }
+            break;
+        }
+        case 8: {
+            editorOptions.speedIncrease2 = atof(editorOptions.inputBuffer);
+            if (editorOptions.speedIncrease2 > 250.0f) {
+                editorOptions.speedIncrease2 = 250.0f;
+            }
+            break;
+        }
+        case 9: {
+            editorOptions.countLevels = atoi(editorOptions.inputBuffer);
+            if (editorOptions.countLevels > 10) {
+                editorOptions.countLevels = 10;
+            }
+            break;
+        }
+        case 10: {
+            editorOptions.countIncrease = atoi(editorOptions.inputBuffer);
+            if (editorOptions.countIncrease > 5) {
+                editorOptions.countIncrease = 5;
+            }
+            break;
+        }
+        }
+    }
+    editorOptions.isValueHidden = 0;  // Показываем значение после сохранения
+    printf("Saved value for field %d: %s\n", editorOptions.focusedInputField, editorOptions.inputBuffer);
+}
+
+void saveRowSettings(int row) {
+    if (row < 0 || row >= editor.cellsY) return;
+
+    editor.rowSettings[row].objectType = selectedObjectType;
+    if (selectedObjectType == OBJ_LAWNMOWER &&
+        editor.rowSettings[row].quantity == 1 && editorOptions.quantity == 2) {
+        isDirLeftPressed = isDirRightPressed = 0;
+    }
+    editor.rowSettings[row].quantity = editorOptions.quantity;
+    editor.rowSettings[row].length = editorOptions.length;
+    editor.rowSettings[row].initialSpeed1 = editorOptions.initialSpeed1;
+    editor.rowSettings[row].initialSpeed2 = editorOptions.initialSpeed2;
+    editor.rowSettings[row].speedLevels1 = editorOptions.speedLevels1;
+    editor.rowSettings[row].speedLevels2 = editorOptions.speedLevels2;
+    editor.rowSettings[row].speedIncrease1 = editorOptions.speedIncrease1;
+    editor.rowSettings[row].speedIncrease2 = editorOptions.speedIncrease2;
+    editor.rowSettings[row].countLevels = editorOptions.countLevels;
+    editor.rowSettings[row].countIncrease = editorOptions.countIncrease;
+    editor.rowSettings[row].direction = isDirLeftPressed ? -1 : (isDirRightPressed ? 1 : 0);
+
+    int i = 0;
+    if (editor.zoneTypes[row] == ZONE_LAWN) {
+        while (editor.zoneTypes[row - i] == ZONE_LAWN) i++;
+        if (i % 2 == 0) i = -1;
+        else i = 1;
+
+        editor.rowSettings[row + i].objectType = selectedObjectType;
+        if (selectedObjectType == OBJ_LAWNMOWER &&
+            editor.rowSettings[row + i].quantity == 1 && editorOptions.quantity == 2) {
+            isDirLeftPressed = isDirRightPressed = 0;
+        }
+        editor.rowSettings[row + i].quantity = editorOptions.quantity;
+        editor.rowSettings[row + i].length = editorOptions.length;
+        editor.rowSettings[row + i].initialSpeed1 = editorOptions.initialSpeed1;
+        editor.rowSettings[row + i].initialSpeed2 = editorOptions.initialSpeed2;
+        editor.rowSettings[row + i].speedLevels1 = editorOptions.speedLevels1;
+        editor.rowSettings[row + i].speedLevels2 = editorOptions.speedLevels2;
+        editor.rowSettings[row + i].speedIncrease1 = editorOptions.speedIncrease1;
+        editor.rowSettings[row + i].speedIncrease2 = editorOptions.speedIncrease2;
+        editor.rowSettings[row + i].countLevels = editorOptions.countLevels;
+        editor.rowSettings[row + i].countIncrease = editorOptions.countIncrease;
+        editor.rowSettings[row + i].direction = isDirLeftPressed ? -1 : (isDirRightPressed ? 1 : 0);
+    }
+
+    printf("Saved settings for row %d:\n{\nObjectType = %d\nQuantity = %d\nLength = %d\ninitialSpeed1 = %f\ninitialSpeed2 = %f\nspeedLevels1 = %d\nspeedLevels2 = %d\nspeedIncrease1 = %f\nspeedIncrease2 = %f\ncountLevels = %d\ncountIncrease = %d\ndirection = %d\n}\n",
+        row, editor.rowSettings[row].objectType, editor.rowSettings[row].quantity, editor.rowSettings[row].length, editor.rowSettings[row].initialSpeed1, editor.rowSettings[row].initialSpeed2,
+        editor.rowSettings[row].speedLevels1, editor.rowSettings[row].speedLevels2, editor.rowSettings[row].speedIncrease1, editor.rowSettings[row].speedIncrease2,
+        editor.rowSettings[row].countLevels, editor.rowSettings[row].countIncrease, editor.rowSettings[row].direction);
+}
+
+void deleteRowSettings(int row) {
+    editor.rowSettings[row].objectType = 0;
+    editor.rowSettings[row].quantity = 0;
+    editor.rowSettings[row].length = 2;
+    editor.rowSettings[row].initialSpeed1 = 0;
+    editor.rowSettings[row].initialSpeed2 = 0;
+    editor.rowSettings[row].speedLevels1 = 0;
+    editor.rowSettings[row].speedLevels2 = 0;
+    editor.rowSettings[row].speedIncrease1 = 0;
+    editor.rowSettings[row].speedIncrease2 = 0;
+    editor.rowSettings[row].countLevels = 0;
+    editor.rowSettings[row].countIncrease = 0;
+    editor.rowSettings[row].direction = 0;
+
+    int i = 0;
+    if (editor.zoneTypes[row] == ZONE_LAWN) {
+        while (editor.zoneTypes[row - i] == ZONE_LAWN) i++;
+        if (i % 2 == 0) i = -1;
+        else i = 1;
+
+        editor.rowSettings[row + i].objectType = 0;
+        editor.rowSettings[row + i].quantity = 0;
+        editor.rowSettings[row + i].length = 2;
+        editor.rowSettings[row + i].initialSpeed1 = 0;
+        editor.rowSettings[row + i].initialSpeed2 = 0;
+        editor.rowSettings[row + i].speedLevels1 = 0;
+        editor.rowSettings[row + i].speedLevels2 = 0;
+        editor.rowSettings[row + i].speedIncrease1 = 0;
+        editor.rowSettings[row + i].speedIncrease2 = 0;
+        editor.rowSettings[row + i].countLevels = 0;
+        editor.rowSettings[row + i].countIncrease = 0;
+        editor.rowSettings[row + i].direction = 0;
+    }
+
+}
+
+void clearEditorOptions() {
+    editorOptions.quantity = 0;
+    editorOptions.length = 2;
+    editorOptions.initialSpeed1 = 0;
+    editorOptions.initialSpeed2 = 0;
+    editorOptions.speedLevels1 = 0;
+    editorOptions.speedLevels2 = 0;
+    editorOptions.speedIncrease1 = 0;
+    editorOptions.speedIncrease2 = 0;
+    editorOptions.countLevels = 0;
+    editorOptions.countIncrease = 0;
+    editorOptions.focusedInputField = 0;
+    isDirLeftPressed = 0;
+    isDirRightPressed = 0;
+    memset(editorOptions.inputBuffer, 0, sizeof(editorOptions.inputBuffer));
+}
+
+void handleZoneSelection(int row) {
+    editor.selectedZoneRow = row;
+
+    // Загружаем настройки для этого ряда, если они есть
+    if (editor.rowSettings[row].objectType != OBJ_EMPTY) {
+        selectedObjectType = editor.rowSettings[row].objectType;
+        editorOptions.quantity = editor.rowSettings[row].quantity;
+        editorOptions.length = editor.rowSettings[row].length;
+        editorOptions.initialSpeed1 = editor.rowSettings[row].initialSpeed1;
+        editorOptions.initialSpeed2 = editor.rowSettings[row].initialSpeed2;
+        editorOptions.speedLevels1 = editor.rowSettings[row].speedLevels1;
+        editorOptions.speedLevels2 = editor.rowSettings[row].speedLevels2;
+        editorOptions.speedIncrease1 = editor.rowSettings[row].speedIncrease1;
+        editorOptions.speedIncrease2 = editor.rowSettings[row].speedIncrease2;
+        editorOptions.countLevels = editor.rowSettings[row].countLevels;
+        editorOptions.countIncrease = editor.rowSettings[row].countIncrease;
+
+        isDirLeftPressed = (editor.rowSettings[row].direction == -1);
+        isDirRightPressed = (editor.rowSettings[row].direction == 1);
+    }
+    else {
+        selectedObjectType = OBJ_EMPTY;
+        clearEditorOptions();
+    }
+
+    // Очищаем буфер ввода
+    memset(editorOptions.inputBuffer, 0, sizeof(editorOptions.inputBuffer));
+    editorOptions.focusedInputField = 0;
+    editorOptions.isValueHidden = 0;
+
+    editor.isOptionsMenuOpen = 1;
+}
+
+int isFieldEnabledForObject(int fieldId, ObjectType objType) {
+
+    // Проверяем, можно ли разместить объект на текущей зоне
+    int isAllowed = isObjectAllowedForZone(selectedObjectType, editor.zoneTypes[editor.selectedZoneRow]);
+
+
+    if (editorOptions.quantity == 0 &&
+        fieldId >= 1 && fieldId <= 10) {
+        return 0;
+    }
+
+    if (!isAllowed && fieldId >= 0 && fieldId <= 10) {
+        return 0;
+    }
+    switch (objType) {
+    case OBJ_SNAKE:
+        if (fieldId == 1 || fieldId == 3 ||
+            fieldId == 5 || fieldId == 7 || fieldId == 8 || fieldId == 9) {
+            return 0;
+        }
+        break;
+
+    case OBJ_LAWNMOWER:
+        if (editorOptions.quantity == 2) {
+            if (fieldId == 1 || fieldId == 10 || fieldId == 8 ||
+                fieldId == 9) {
+                printf("2: %d\n", fieldId);
+                return 0;
+            }
+        }
+        else if (editorOptions.quantity == 1) {
+            if (fieldId == 1 || fieldId == 3 || fieldId == 5 ||
+                fieldId == 7 || fieldId == 8 || fieldId == 9) {
+                printf("1: %d\n", fieldId);
+                return 0;
+            }
+        }
+        break;
+    case OBJ_CAR1:
+    case OBJ_CAR2:
+    case OBJ_CAR3:
+    case OBJ_CAR4:
+    case OBJ_TRUCK:
+        if (fieldId == 1 || fieldId == 3 || fieldId == 5 ||
+            fieldId == 7) {
+            return 0;
+        }
+        break;
+    case OBJ_LOG:
+    case OBJ_TURTLE:
+        if (fieldId == 3 || fieldId == 5 || fieldId == 7 ||
+            fieldId == 8 || fieldId == 9) {
+            return 0;
+        }
+        break;
+    case OBJ_EMPTY:
+        if (fieldId >= 0 && fieldId <= 10) {
+            return 0;
+        }
+        break;
+    default:
+        return 1;
+    }
+    return 1;
+}
+
+void processEditorTextInput(GLFWwindow* window) {
+    if (editorOptions.focusedInputField == 0) return;
+
+    // Как только начинаем ввод - показываем вводимые символы
+    editorOptions.isValueHidden = 0;
+    if (strlen(editorOptions.inputBuffer) <= 5) {
+        // Обработка цифр
+        for (int key = GLFW_KEY_0; key <= GLFW_KEY_9; key++) {
+            if (glfwGetKey(window, key) == GLFW_PRESS && !keyStateInput.keyPressed[key]) {
+                char digit = '0' + (key - GLFW_KEY_0);
+                strncat(editorOptions.inputBuffer, &digit, 1);
+                keyStateInput.keyPressed[key] = 1;
+            }
+            else if (glfwGetKey(window, key) == GLFW_RELEASE) {
+                keyStateInput.keyPressed[key] = 0;
+            }
+        }
+
+        // Обработка точки
+        if (glfwGetKey(window, GLFW_KEY_PERIOD) == GLFW_PRESS &&
+            !keyStateInput.keyPressed[GLFW_KEY_PERIOD] &&
+            strchr(editorOptions.inputBuffer, '.') == NULL) {
+            strncat(editorOptions.inputBuffer, ".", 1);
+            keyStateInput.keyPressed[GLFW_KEY_PERIOD] = 1;
+        }
+        else if (glfwGetKey(window, GLFW_KEY_PERIOD) == GLFW_RELEASE) {
+            keyStateInput.keyPressed[GLFW_KEY_PERIOD] = 0;
+        }
+
+    }
+
+    // Обработка Backspace
+    if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS &&
+        !keyStateInput.keyPressed[GLFW_KEY_BACKSPACE] &&
+        strlen(editorOptions.inputBuffer) > 0) {
+        editorOptions.inputBuffer[strlen(editorOptions.inputBuffer) - 1] = '\0';
+        keyStateInput.keyPressed[GLFW_KEY_BACKSPACE] = 1;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_RELEASE) {
+        keyStateInput.keyPressed[GLFW_KEY_BACKSPACE] = 0;
+    }
+
+    // Обработка Enter
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS &&
+        !keyStateInput.keyPressed[GLFW_KEY_ENTER]) {
+        saveEditorInputValue();
+        editorOptions.focusedInputField = 0;
+        memset(editorOptions.inputBuffer, 0, sizeof(editorOptions.inputBuffer));
+        keyStateInput.keyPressed[GLFW_KEY_ENTER] = 1;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_RELEASE) {
+        keyStateInput.keyPressed[GLFW_KEY_ENTER] = 0;
+    }
+}
+
+int isObjectAllowedForZone(ObjectType objType, ZoneType zone) {
+    if (objType == OBJ_EMPTY) {
+        return 1; // Пустой объект можно "размещать" где угодно (фактически это удаление)
+    }
+
+    switch (zone) {
+    case ZONE_ROAD:
+        return (objType >= OBJ_CAR1 && objType <= OBJ_TRUCK);
+    case ZONE_WATER:
+        return (objType == OBJ_LOG || objType == OBJ_TURTLE);
+    case ZONE_LAWN:
+        return (objType == OBJ_LAWNMOWER);
+    case ZONE_GRASS:
+        return (objType == OBJ_SNAKE);
+    default:
+        return 0;
+    }
+}
+
+void handleEditorOptionsMenuClick(double mouseX, double mouseY) {
+    const struct {
+        int fieldId;
+        float x, y, w, h;
+    } inputFields[] = {
+        {1, 125, 110, 250, 80},  // Количество
+        {2, 125, 210, 250, 80},  // Длина
+        {3, 120, 410, 120, 80},  // Нач. скорость 1
+        {4, 260, 410, 120, 80},  // Нач. скорость 2
+        {5, 120, 510, 120, 80},  // Уровни скорости 1
+        {6, 260, 510, 120, 80},  // Уровни скорости 2
+        {7, 120, 610, 120, 80},  // Пов. скорости 1
+        {8, 260, 610, 120, 80},  // Пов. скорости 2
+        {9, 190, 710, 120, 80},  // Уровни количества
+        {10, 190, 810, 120, 80}  // Пов. количества
+    };
+
+    int isAllowed = isObjectAllowedForZone(selectedObjectType, editor.zoneTypes[editor.selectedZoneRow]);
+
+    // Проверка кнопки "вставить" (справа)
+    if (editor.optionsMenuPosX < GAME_WIDTH / 2 &&
+        mouseX >= editor.optionsMenuPosX + 415 && mouseX <= editor.optionsMenuPosX + 485 &&
+        mouseY >= 815 && mouseY <= 885) {
+        if (isAllowed &&
+            (selectedObjectType == OBJ_EMPTY || isDirLeftPressed || isDirRightPressed || selectedObjectType == OBJ_LAWNMOWER && editorOptions.quantity == 2)) { // нужно выбрать направление
+            saveRowSettings(editor.selectedZoneRow);
+            Mix_PlayChannel(-1, sounds.click, 0);
+            closeOptionsMenu();
+        }
+        else {
+            Mix_PlayChannel(-1, sounds.error, 0);
+        }
+        return;
+    }
+
+    // Проверка кнопки "вставить" (слева)
+    if (editor.optionsMenuPosX > GAME_WIDTH / 2 &&
+        mouseX >= editor.optionsMenuPosX - 85 && mouseX <= editor.optionsMenuPosX - 15 &&
+        mouseY >= 815 && mouseY <= 885) {
+        if (isAllowed &&
+            (selectedObjectType == OBJ_EMPTY || isDirLeftPressed || isDirRightPressed || selectedObjectType == OBJ_LAWNMOWER && editorOptions.quantity == 2)) { // нужно выбрать направление
+            saveRowSettings(editor.selectedZoneRow);
+            Mix_PlayChannel(-1, sounds.click, 0);
+            closeOptionsMenu();
+        }
+        else {
+            Mix_PlayChannel(-1, sounds.error, 0);
+        }
+        return;
+    }
+
+    // Проверяем, находится ли курсор в пределах меню Options
+    if (mouseX >= editor.optionsMenuPosX &&
+        mouseX <= editor.optionsMenuPosX + 400 &&
+        mouseY >= 0 &&
+        mouseY <= 900) {
+
+        // Обработка кнопок выбора типа объекта
+        if (mouseX >= editor.optionsMenuPosX + 125 && mouseX <= editor.optionsMenuPosX + 195 &&
+            mouseY >= 15 && mouseY <= 85) {
+            // Кнопка "тип->влево" 
+            if (selectedObjectType == OBJ_LAWNMOWER || selectedObjectType == OBJ_SNAKE ||
+                selectedObjectType == OBJ_LOG || selectedObjectType == OBJ_CAR1) {
+                clearEditorOptions();
+            }
+            selectedObjectType = (selectedObjectType - 1 + OBJ_COUNT) % OBJ_COUNT;
+            Mix_PlayChannel(-1, sounds.click, 0);
+        }
+        else if (mouseX >= editor.optionsMenuPosX + 305 && mouseX <= editor.optionsMenuPosX + 375 &&
+            mouseY >= 15 && mouseY <= 85) {
+            // Кнопка "тип->вправо"
+            if (selectedObjectType == OBJ_TRUCK || selectedObjectType == OBJ_TURTLE ||
+                selectedObjectType == OBJ_SNAKE || selectedObjectType == OBJ_LAWNMOWER) {
+                clearEditorOptions();
+            }
+            selectedObjectType = (selectedObjectType + 1) % OBJ_COUNT;
+            Mix_PlayChannel(-1, sounds.click, 0);
+        }
+
+        for (size_t i = 0; i < sizeof(inputFields) / sizeof(inputFields[0]); i++) {
+            if (mouseX >= editor.optionsMenuPosX + inputFields[i].x &&
+                mouseX <= editor.optionsMenuPosX + inputFields[i].x + inputFields[i].w &&
+                mouseY >= inputFields[i].y &&
+                mouseY <= inputFields[i].y + inputFields[i].h) {
+
+                // Проверяем, активно ли поле для текущего объекта (текстового)
+                if (!isFieldEnabledForObject(inputFields[i].fieldId - 1, selectedObjectType)) {
+                    return;
+                }
+
+                if (editorOptions.focusedInputField != inputFields[i].fieldId) {
+
+                    // Заполняем буфер текущим значением
+                    switch (inputFields[i].fieldId) {
+                    case 1: sprintf(editorOptions.inputBuffer, "%d", editorOptions.quantity); break;
+                    case 2: sprintf(editorOptions.inputBuffer, "%d", editorOptions.length); break;
+                    case 3: sprintf(editorOptions.inputBuffer, "%.1f", editorOptions.initialSpeed1); break;
+                    case 4: sprintf(editorOptions.inputBuffer, "%.1f", editorOptions.initialSpeed2); break;
+                    case 5: sprintf(editorOptions.inputBuffer, "%d", editorOptions.speedLevels1); break;
+                    case 6: sprintf(editorOptions.inputBuffer, "%d", editorOptions.speedLevels2); break;
+                    case 7: sprintf(editorOptions.inputBuffer, "%.1f", editorOptions.speedIncrease1); break;
+                    case 8: sprintf(editorOptions.inputBuffer, "%.1f", editorOptions.speedIncrease2); break;
+                    case 9: sprintf(editorOptions.inputBuffer, "%d", editorOptions.countLevels); break;
+                    case 10: sprintf(editorOptions.inputBuffer, "%d", editorOptions.countIncrease); break;
+                    }
+
+                    editorOptions.focusedInputField = inputFields[i].fieldId;
+                    editorOptions.isValueHidden = 1;  // Скрываем значение
+                    editorOptions.inputBuffer[0] = '\0'; // Очищаем буфер ввода
+                }
+                printf("Focused input field %d\n", inputFields[i].fieldId);
+                return;
+            }
+        }
+
+        // Проверяем, активно ли поле для текущего объекта (текстового)
+        if (!isFieldEnabledForObject(10, selectedObjectType)) {
+            return;
+        }
+
+        if (mouseX >= editor.optionsMenuPosX + 170 && mouseX <= editor.optionsMenuPosX + 240 &&
+            mouseY >= editor.optionsMenuPosY + 315 && mouseY <= editor.optionsMenuPosY + 385) {
+            isDirLeftPressed = 1;
+            isDirRightPressed = 0;
+        }
+        else if (mouseX >= editor.optionsMenuPosX + 260 && mouseX <= editor.optionsMenuPosX + 330 &&
+            mouseY >= editor.optionsMenuPosY + 315 && mouseY <= editor.optionsMenuPosY + 385) {
+            isDirLeftPressed = 0;
+            isDirRightPressed = 1;
+        }
+
+        // Клик вне полей ввода - снимаем фокус
+        if (editorOptions.focusedInputField != 0) {
+            // Если ничего не ввели, восстанавливаем предыдущее значение
+            if (strlen(editorOptions.inputBuffer) == 0) {
+                strcpy(editorOptions.inputBuffer, editorOptions.prevValue);
+            }
+            saveEditorInputValue();
+            editorOptions.focusedInputField = 0;
+            editorOptions.isValueHidden = 0;  // Показываем значение снова
+            memset(editorOptions.inputBuffer, 0, sizeof(editorOptions.inputBuffer));
+        }
+    }
+}
+
+void editorMouseButton(GLFWwindow* window, int button, int action, int mods) {
+    int isInOptionsMenu = 0;
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        if (editor.isOptionsMenuOpen &&
+            cursorX >= editor.optionsMenuPosX &&
+            cursorX <= editor.optionsMenuPosX + 400 &&
+            cursorY >= 0 &&
+            cursorY <= 900 ||
+            editor.optionsMenuPosX < GAME_WIDTH / 2 &&
+            cursorX >= editor.optionsMenuPosX + 415 && cursorX <= editor.optionsMenuPosX + 485 &&
+            cursorY >= 815 && cursorY <= 885 ||
+            editor.optionsMenuPosX > GAME_WIDTH / 2 &&
+            cursorX >= editor.optionsMenuPosX - 85 && cursorX <= editor.optionsMenuPosX - 15 &&
+            cursorY >= 815 && cursorY <= 885 && gameState == EDITOR) {
+
+            isInOptionsMenu = 1;
+
+        }
+        if (!isInOptionsMenu) {
+            double mouseX, mouseY;
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+
+            // Если зона не выбрана - разрешаем панорамирование
+            if (mouseX >= 0 && mouseX < GAME_WIDTH &&
+                mouseY >= 0 && mouseY < HEIGHT) {
+                isPanning = 1;
+                lastMouseX = mouseX;
+                lastMouseY = mouseY;
+            }
+        }
+    }
+    else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+
+        if (editor.isOptionsMenuOpen &&
+            cursorX >= editor.optionsMenuPosX &&
+            cursorX <= editor.optionsMenuPosX + 400 &&
+            cursorY >= 0 &&
+            cursorY <= 900 ||
+            editor.optionsMenuPosX < GAME_WIDTH / 2 &&
+            cursorX >= editor.optionsMenuPosX + 415 && cursorX <= editor.optionsMenuPosX + 485 &&
+            cursorY >= 815 && cursorY <= 885 ||
+            editor.optionsMenuPosX > GAME_WIDTH / 2 &&
+            cursorX >= editor.optionsMenuPosX - 85 && cursorX <= editor.optionsMenuPosX - 15 &&
+            cursorY >= 815 && cursorY <= 885 && gameState == EDITOR) {
+
+            handleEditorOptionsMenuClick(cursorX, cursorY);
+
+        }
+        isPanning = 0;
+    }
+}
+
+
+void editorMouseMove(GLFWwindow* window, double xpos, double ypos) {
+    if (gameState == EDITOR) {
+        // Сохраняем позицию курсора
+        cursorX = xpos;
+        cursorY = ypos;
+
+        // Проверяем находится ли курсор в пределах меню параметров
+        int isInOptionsMenu = 0;
+        if (editor.isOptionsMenuOpen) {
+            if (xpos >= editor.optionsMenuPosX &&
+                xpos <= editor.optionsMenuPosX + 400 &&
+                ypos >= 0 &&
+                ypos <= 900 ||
+                editor.optionsMenuPosX < GAME_WIDTH / 2 &&
+                xpos >= editor.optionsMenuPosX + 415 && xpos <= editor.optionsMenuPosX + 485 &&
+                ypos >= 815 && ypos <= 885 ||
+                editor.optionsMenuPosX > GAME_WIDTH / 2 &&
+                xpos >= editor.optionsMenuPosX - 85 && xpos <= editor.optionsMenuPosX - 15 &&
+                ypos >= 815 && ypos <= 885) {
+                isInOptionsMenu = 1;
+            }
+        }
+
+        // Проверяем находится ли курсор в пределах игрового поля
+        isCursorInEditorField = !isInOptionsMenu &&
+            (xpos >= 0 && xpos < GAME_WIDTH &&
+                ypos >= 0 && ypos < HEIGHT);
+
+        if (isPanning) {
+            xpos = fmax(0, fmin(xpos, GAME_WIDTH - 1));
+            ypos = fmax(0, fmin(ypos, HEIGHT - 1));
+            editor.panX += (xpos - lastMouseX);
+            editor.panY += (ypos - lastMouseY);
+            lastMouseX = xpos;
+            lastMouseY = ypos;
+        }
+    }
+}
+
+int clamp(int value, int min, int max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+}
+
+// Функция для очистки массива препятствий
+void clearCars(Car* cars, int count) {
+    for (int i = 0; i < count; i++) {
+        cars[i].texture = 0; // Обнуляем текстуру (маркер неактивности)
+    }
+}
+
+// Функция для очистки массива бревен
+void clearLogs(Log* logs, int count) {
+    for (int i = 0; i < count; i++) {
+        logs[i].width = 0; // Обнуляем ширину (маркер неактивности)
+    }
+}
+
+// Функция для очистки массива черепах
+void clearTurtles(Turtle* turtles, int count) {
+    for (int i = 0; i < count; i++) {
+        turtles[i].width = 0; // Обнуляем ширину (маркер неактивности)
+    }
+}
+
+void drawHitbox(float x, float y, float w, float h, Hitbox hb) {
+    // Рассчитываем реальные границы хитбокса
+    float left = x + w * hb.left;
+    float right = x + w - w * hb.right;
+    float top = y + h * hb.top;
+    float bottom = y + h - h * hb.bottom;
+    float width = right - left;
+    float height = bottom - top;
+
+    glDisable(GL_TEXTURE_2D);
+
+    // Полупрозрачная заливка
+    glColor4f(1.0f, 0.0f, 0.5f, 0.3f);
+    glBegin(GL_QUADS);
+    glVertex2f(left, top);
+    glVertex2f(right, top);
+    glVertex2f(right, bottom);
+    glVertex2f(left, bottom);
+    glEnd();
+
+    // Контур
+    glLineWidth(2.0f);
+    glColor4f(1.0f, 1.0f, 1.0f, 0.8f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(left, top);
+    glVertex2f(right, top);
+    glVertex2f(right, bottom);
+    glVertex2f(left, bottom);
+    glEnd();
+
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1);
+}
+
+
+// Функция для проверки столкновения двух объектов с учетом их хитбоксов
+int checkCollision(float x1, float y1, float w1, float h1, Hitbox hb1,
+    float x2, float y2, float w2, float h2, Hitbox hb2) {
+    // Рассчитываем реальные границы с учетом хитбоксов
+    float left1 = x1 + w1 * hb1.left;
+    float right1 = x1 + w1 - w1 * hb1.right;
+    float top1 = y1 + h1 * hb1.top;
+    float bottom1 = y1 + h1 - h1 * hb1.bottom;
+
+    float left2 = x2 + w2 * hb2.left;
+    float right2 = x2 + w2 - w2 * hb2.right;
+    float top2 = y2 + h2 * hb2.top;
+    float bottom2 = y2 + h2 - h2 * hb2.bottom;
+
+    // Проверяем пересечение
+    return !(right1 < left2 || left1 > right2 || bottom1 < top2 || top1 > bottom2);
+}
+
+// Хелпер-функция для проверки столкновения с игроком
+int checkPlayerCollision(float objX, float objY, float objW, float objH, Hitbox objHitbox,
+    float playerX, float playerY) {
+    if (noclipEnabled) return 0;  // В режиме noclip столкновений нет
+
+    float cellW = GAME_WIDTH / CELLS_X;
+    float cellH = HEIGHT / CELLS_Y;
+    Hitbox frogHitbox = { .left = 0.1f, .right = 0.1f, .top = 0.1f, .bottom = 0.1f };
+
+    return checkCollision(objX, objY, objW, cellH, objHitbox,
+        playerX, playerY, cellW, cellH, frogHitbox);
+}
+
+
+GLuint loadTexture(const char* path) {
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load(path, &width, &height, &nrChannels, 4);
+    if (!data) {
+        printf("Failed to load texture: %s\n", path);
+        return 0;
+    }
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_image_free(data);
+    return texture;
+}
+
+void drawText(const char* text, float x, float y) {
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f); // Чёрный цвет текста
+
+    glRasterPos2f(x, y);
+    for (const char* c = text; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    glEnable(GL_TEXTURE_2D);
+}
+
+int calculateTextWidth(const char* text) {
+    int width = 0;
+    for (const char* c = text; *c; c++) {
+        width += glutBitmapWidth(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+    return width;
+}
+
+void drawTextCentered(const char* text, float y) {
+    int textWidth = calculateTextWidth(text);
+    float x = (WIDTH - textWidth) / 2.0f; // Центрирование по горизонтали
+
+    glRasterPos2f(x, y);
+    for (const char* c = text; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+}
+
+void drawQuad(float x, float y, float w, float h, int flipX) {
+    glBegin(GL_QUADS);
+    if (flipX) {
+        glTexCoord2f(1, 0); glVertex2f(x, y);
+        glTexCoord2f(0, 0); glVertex2f(x + w, y);
+        glTexCoord2f(0, 1); glVertex2f(x + w, y + h);
+        glTexCoord2f(1, 1); glVertex2f(x, y + h);
+    }
+    else {
+        glTexCoord2f(0, 0); glVertex2f(x, y);
+        glTexCoord2f(1, 0); glVertex2f(x + w, y);
+        glTexCoord2f(1, 1); glVertex2f(x + w, y + h);
+        glTexCoord2f(0, 1); glVertex2f(x, y + h);
+    }
+    glEnd();
+}
+
+float getSnappedSliderValue(float rawValue) {
+    // Ограничиваем значение в пределах [0, 1]
+    if (rawValue < 0.0f) rawValue = 0.0f;
+    if (rawValue > 1.0f) rawValue = 1.0f;
+
+    // 19 возможных позиций (от 2 до 30)
+    int steps = 28;
+    float stepSize = 1.0f / steps;
+
+    // Находим ближайшую позицию
+    int nearestStep = (int)(rawValue * steps + 0.5f);
+    return nearestStep * stepSize;
+}
+
+void cleanupSoundSystem() {
+    Mix_FreeChunk(sounds.click);
+    Mix_FreeChunk(sounds.explode);
+    Mix_FreeChunk(sounds.jump);
+    Mix_FreeChunk(sounds.levelup);
+    Mix_FreeChunk(sounds.play);
+    Mix_FreeMusic(sounds.gameMusic);
+    Mix_FreeMusic(sounds.menuMusic);
+
+    Mix_CloseAudio();
+}
+
+void updateEditorTransforms() {
+    // Обновляем размеры с учетом зума
+    editor.cellSize = editor.baseCellSize * editor.zoomFactor;
+    editor.fieldWidth = editor.cellSize * editor.cellsX;
+    editor.fieldHeight = editor.cellSize * editor.cellsY;
+}
+
+
+void editorMouseWheel(GLFWwindow* window, double xoffset, double yoffset) {
+    if (!(glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) || gameState != EDITOR) {
+        return;
+    }
+
+    // Получаем позицию мыши в мировых координатах
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+
+    // Преобразуем в координаты мира до зума
+    float worldX = (mouseX - editor.panX - editor.viewOffsetX) / editor.zoomFactor;
+    float worldY = (mouseY - editor.panY - editor.viewOffsetY) / editor.zoomFactor;
+
+    // Изменяем масштаб
+    float oldZoom = editor.zoomFactor;
+    editor.zoomFactor += yoffset * 0.1f;
+    editor.zoomFactor = fmaxf(0.25f, fminf(2.0f, editor.zoomFactor));
+
+    // Вычисляем новую позицию для сохранения точки под курсором
+    editor.panX = mouseX - worldX * editor.zoomFactor - editor.viewOffsetX;
+    editor.panY = mouseY - worldY * editor.zoomFactor - editor.viewOffsetY;
+
+    // Обновляем трансформации
+    updateEditorTransforms();
+}
+
+
+void updateAlligators(Alligator* alligators, float deltaTime) {
+    for (int i = 0; i < ALLIGATOR_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+        if (!alligators[i].isActive) continue;
+
+        // Движение
+        alligators[i].x += alligators[i].speed * deltaTime * alligators[i].direction;
+
+        // Границы
+        if (alligators[i].direction == 1 && alligators[i].x > alligators[i].rightBoundary + GAME_WIDTH / CELLS_X) {
+            alligators[i].x = -alligators[i].width;
+        }
+        else if (alligators[i].direction == -1 && alligators[i].x < -alligators[i].width) {
+            alligators[i].x = alligators[i].rightBoundary + GAME_WIDTH / CELLS_X;
+        }
+
+        // Анимация пасти
+        alligators[i].mouthTimer += deltaTime;
+
+        if (alligators[i].mouthTimer > ALLIGATOR_ANIM_SPEED) {
+            alligators[i].mouthState = !alligators[i].mouthState;
+            alligators[i].mouthTimer = 0.0f;
+        }
+
+        // Плавное изменение состояния
+        if (alligators[i].mouthState == 1) {
+            alligators[i].mouthProgress = fminf(1.0f, alligators[i].mouthProgress + deltaTime * 2.0f);
+        }
+        else {
+            alligators[i].mouthProgress = fmaxf(0.0f, alligators[i].mouthProgress - deltaTime * 2.0f);
+        }
+    }
+}
+
+int isZonePlacementValid(ZoneType zone, int startRow) {
+    if (startRow < 0 || startRow >= editor.cellsY)
+        return 0;
+
+    // Для газона проверяем 2 ряда
+    int rowsNeeded = (zone == ZONE_LAWN) ? 2 : 1;
+    if (startRow + rowsNeeded > editor.cellsY)
+        return 0;
+
+    // Проверяем конфликты с существующими зонами
+    for (int i = startRow; i < startRow + rowsNeeded; i++) {
+        // Не ставим никакю зону поверх другой
+        if (editor.zoneTypes[i] != ZONE_NONE) {
+            return 0;
+        }
+
+        // Другие зоны нельзя ставить поверх газона
+        if (zone != ZONE_LAWN && editor.zoneTypes[i] == ZONE_LAWN) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+void initEditor(int cellsX, int cellsY) {
+    editor.cellsX = cellsX;
+    editor.cellsY = cellsY;
+
+    // Фиксированный размер ячейки (как в оригинальной игре)
+    editor.cellSize = GAME_WIDTH / 20.0f;
+    // Размеры всего поля
+    editor.fieldWidth = editor.cellSize * cellsX;
+    editor.fieldHeight = editor.cellSize * cellsY;
+
+    // Центрирование поля (центр в GAME_WIDTH/2, HEIGHT/2)
+    editor.viewOffsetX = (GAME_WIDTH - editor.fieldWidth) / 2;
+    editor.viewOffsetY = (HEIGHT - editor.fieldHeight) / 2;
+
+    editor.zoomFactor = 1.0f;
+    editor.panX = editor.panY = 0.0f;
+    editor.baseCellSize = GAME_WIDTH / 20.0f; // 20 клеток по ширине
+
+
+    // Инициализация массива зон
+    editor.zoneTypes = (int*)malloc(cellsY * sizeof(int));
+    for (int i = 0; i < cellsY; i++) {
+        editor.zoneTypes[i] = ZONE_NONE;
+    }
+
+    editorMode = EDITOR_MODE_NONE;
+    memset(homePositions, 0, sizeof(homePositions));
+    spawnX = spawnY = -999;
+
+    // Выделяем память для настроек рядов
+    editor.rowSettings = (RowSettings*)malloc(cellsY * sizeof(RowSettings));
+    if (editor.rowSettings == NULL) {
+        printf("Failed to allocate memory for row settings\n");
+        exit(1);
+    }
+
+    // Инициализируем настройки рядов
+    for (int i = 0; i < cellsY; i++) {
+        memset(&editor.rowSettings[i], 0, sizeof(RowSettings));
+        editor.rowSettings[i].objectType = OBJ_EMPTY;
+    }
+
+    updateEditorTransforms();
+}
+
+int initSoundSystem() {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        printf("SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError());
+        return 0;
+    }
+
+    // Загрузка звуков
+    sounds.click = Mix_LoadWAV("sounds/click1.ogg");
+    sounds.explode = Mix_LoadWAV("sounds/explode.ogg");
+    sounds.jump = Mix_LoadWAV("sounds/jump.ogg");
+    sounds.levelup = Mix_LoadWAV("sounds/levelup.ogg");
+    sounds.play = Mix_LoadWAV("sounds/play.ogg");
+    sounds.quit = Mix_LoadWAV("sounds/quit.ogg");
+    sounds.gameOver = (Mix_Music*)Mix_LoadWAV("sounds/gameOver.ogg");
+    sounds.error = Mix_LoadWAV("sounds/error.ogg");
+
+    // Загрузка музыки
+    sounds.gameMusic = (Mix_Music*)Mix_LoadMUS("sounds/gameloop.mp3");
+    sounds.menuMusic = (Mix_Music*)Mix_LoadMUS("sounds/menuloop.mp3");
+
+    if (!sounds.click || !sounds.explode || !sounds.jump ||
+        !sounds.levelup || !sounds.play || !sounds.quit ||
+        !sounds.gameMusic || !sounds.menuMusic) {
+        printf("Failed to load some sounds! SDL_mixer Error: %s\n", Mix_GetError());
+        return 0;
+    }
+
+    return 1;
+}
+
+void initSliders() {
+    // Инициализация ползунка для X (20 клеток)
+    xSizeSlider.value = getSnappedSliderValue((20 - 2) / 28.0f);
+    xSizeSlider.x = (WIDTH - 300) / 2;
+    xSizeSlider.y = (HEIGHT - 100) / 2;
+    xSizeSlider.width = 300;
+    xSizeSlider.isDragging = 0;
+
+    // Инициализация ползунка для Y (15 клеток)
+    ySizeSlider.value = getSnappedSliderValue((15 - 2) / 28.0f);
+    ySizeSlider.x = (WIDTH - 300) / 2;
+    ySizeSlider.y = (HEIGHT - 100) / 2 + 50;
+    ySizeSlider.width = 300;
+    ySizeSlider.isDragging = 0;
+
+    selectedCellsX = 20;
+    selectedCellsY = 15;
+}
+
+void initAlligators(Alligator* alligators, Log* logs) {
+    int alligatorRow = 1 + 2 * (rand() % 100 < 30) + 3 * (rand() % 100 > 70);
+    int alligatorIndex = 0;
+
+    for (int i = 0; i < ALLIGATOR_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+        alligators[i].isActive = 0;
+    }
+
+    if (currentLevel >= 3) {
+        for (int i = 0; i < LOG_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (logs[i].width == 0) continue;
+
+            if ((int)(logs[i].y / (HEIGHT / CELLS_Y)) == alligatorRow &&
+                rand() % 100 < 30 && alligatorIndex < MAX_OBSTACLES_PER_ROW) {
+
+                float segmentWidth = GAME_WIDTH / CELLS_X;
+                int segments = (int)(logs[i].width / segmentWidth + 0.5f);
+                segments = segments < 2 ? 2 : segments;
+
+                alligators[alligatorIndex].x = logs[i].x;
+                alligators[alligatorIndex].y = logs[i].y;
+                alligators[alligatorIndex].speed = logs[i].speed;
+                alligators[alligatorIndex].direction = logs[i].direction;
+                alligators[alligatorIndex].width = segments * segmentWidth;
+                alligators[alligatorIndex].rightBoundary = logs[i].rightBoundary;
+
+                // Основной хитбокс (как у бревна)
+                alligators[alligatorIndex].hitbox = (Hitbox){ .left = 0.05f, .right = 0.05f, .top = 0.05f, .bottom = 0.05f };
+
+                // Хитбокс головы (зависит от направления)
+                if (alligators[alligatorIndex].direction == 1) {
+                    // Движение вправо - голова справа
+                    alligators[alligatorIndex].headHitbox = (Hitbox){
+                        .left = 1.0f - (segmentWidth / alligators[alligatorIndex].width) + 0.1f,
+                        .right = 0.1f,
+                        .top = 0.2f,
+                        .bottom = 0.2f
+                    };
+                }
+                else {
+                    // Движение влево - голова слева
+                    alligators[alligatorIndex].headHitbox = (Hitbox){
+                        .left = 0.1f,
+                        .right = 1.0f - (segmentWidth / alligators[alligatorIndex].width) + 0.1f,
+                        .top = 0.2f,
+                        .bottom = 0.2f
+                    };
+                }
+
+                alligators[alligatorIndex].isActive = 1;
+                alligators[alligatorIndex].mouthState = 0;
+                alligators[alligatorIndex].mouthTimer = 0.0f;
+                alligators[alligatorIndex].mouthProgress = 0.0f;
+
+                logs[i].width = 0;
+                alligatorIndex++;
+
+                break;
+            }
+        }
+    }
+}
+
+// Функция инициализации машин (вызвать перед основным циклом):
+void initCars(Car* cars) {
+
+    clearCars(cars, CAR_ROWS * MAX_OBSTACLES_PER_ROW);
+    int carIndex = 0;
+    int rows[] = { 9, 10, 11, 12, 13 }; // Ряды с машинами
+    int directions[] = { -1, 1, -1, 1, -1 };
+    GLuint textures[] = { truckTex, car1Tex, car2Tex, car3Tex, car4Tex };
+
+    for (int i = 0; i < CAR_ROWS; i++) {
+        int row = rows[i];
+        int objectsInRow = carsPerRow[i]; // Используем глобальный массив
+        float speed = carSpeeds[i];       // Используем глобальную скорость
+
+        // Вычисляем базовое расстояние между машинами
+        float baseSpace = GAME_WIDTH / objectsInRow;
+
+        // Размещаем машины
+        float prevX = -baseSpace;
+        for (int j = 0; j < objectsInRow; j++) {
+            cars[carIndex].row = row;
+            cars[carIndex].y = row * (HEIGHT / CELLS_Y);
+            cars[carIndex].speed = speed;
+            cars[carIndex].direction = directions[i];
+            cars[carIndex].texture = textures[i];
+
+            // Вычисляем позицию с рандомным смещением
+            float randomOffset = (j != 0) ? (rand() % (int)(baseSpace * 100)) / 100.0f - baseSpace / 2 : 0;
+            float currentLength = (textures[i] == truckTex) ? GAME_WIDTH / CELLS_X * 2 : GAME_WIDTH / CELLS_X;
+
+            cars[carIndex].x = prevX + baseSpace + ((j != 0) ? currentLength : 0) + randomOffset;
+            prevX = cars[carIndex].x;
+
+            // Сохраняем начальную позицию
+            cars[carIndex].startX = cars[carIndex].x;
+            cars[carIndex].startY = cars[carIndex].y;
+
+            carIndex++;
+        }
+
+        // Вычисляем правую границу зацикливания для ряда
+        float rightBoundary = cars[carIndex - 1].x;
+        rightBoundary = (rightBoundary < GAME_WIDTH) ? GAME_WIDTH : rightBoundary;
+
+        // Сохраняем границу для всех машин в ряду
+        for (int j = 0; j < objectsInRow; j++) {
+            cars[carIndex - j - 1].rightBoundary = rightBoundary;
+        }
+    }
+}
+
+void initLogs(Log* logs) {
+
+    clearLogs(logs, LOG_ROWS * MAX_OBSTACLES_PER_ROW);
+    int logIndex = 0;
+    int waterRows[] = { 4, 3, 1 }; // Ряды воды для бревен
+    int directions[] = { 1, 1, 1 };
+    float widths[] = { 6.0f, 4.0f, 3.0f };
+
+    for (int i = 0; i < LOG_ROWS; i++) {
+        int row = waterRows[i];
+        int objectsInRow = logsPerRow[i];
+        float speed = logSpeeds[i]; // Используем глобальную скорость
+
+        // Вычисляем базовое расстояние между бревнами
+        float baseSpace = GAME_WIDTH / objectsInRow;
+
+        // Размещаем бревна
+        float prevX = -baseSpace;
+        for (int j = 0; j < objectsInRow; j++) {
+            logs[logIndex].y = row * (HEIGHT / CELLS_Y);
+            logs[logIndex].speed = speed;
+            logs[logIndex].direction = directions[i];
+            logs[logIndex].width = (GAME_WIDTH / CELLS_X) * widths[i];
+
+            // Вычисляем позицию с рандомным смещением
+            float randomOffset = (j != 0) ? (rand() % (int)(baseSpace * 100)) / 100.0f - baseSpace / 2 : 0;
+            logs[logIndex].x = prevX + baseSpace + ((j != 0) ? logs[logIndex].width : 0) + randomOffset;
+            prevX = logs[logIndex].x;
+
+            logIndex++;
+        }
+
+        // Вычисляем правую границу зацикливания для ряда
+        float rightBoundary = logs[logIndex - 1].x;
+        rightBoundary = (rightBoundary < GAME_WIDTH) ? GAME_WIDTH : rightBoundary;
+
+        // Сохраняем границу для всех бревен в ряду
+        for (int j = 0; j < objectsInRow; j++) {
+            logs[logIndex - j - 1].rightBoundary = rightBoundary;
+        }
+    }
+}
+
+void initTurtles(Turtle* turtles) {
+
+    clearTurtles(turtles, TURTLE_ROWS * MAX_OBSTACLES_PER_ROW);
+    int turtleIndex = 0;
+    int waterRows[] = { 5, 2 }; // Ряды с черепахами
+    int directions[] = { -1, -1 };
+    float widths[] = { 2.0f, 3.0f };
+
+    for (int i = 0; i < TURTLE_ROWS; i++) {
+        int row = waterRows[i];
+        int objectsInRow = turtlesPerRow[i];
+        float speed = turtleSpeeds[i]; // Используем глобальную скорость
+
+        float baseSpace = GAME_WIDTH / objectsInRow;
+
+        // Определяем сколько черепах будут нырять
+        int divingCount = rand() % (objectsInRow / 2 + 1);
+        int* divingIndices = malloc(objectsInRow * sizeof(int));
+        for (int k = 0; k < objectsInRow; k++) {
+            divingIndices[k] = (k < divingCount) ? 1 : 0;
+        }
+
+        // Перемешиваем массив
+        for (int k = 0; k < objectsInRow; k++) {
+            int swapWith = rand() % objectsInRow;
+            int temp = divingIndices[k];
+            divingIndices[k] = divingIndices[swapWith];
+            divingIndices[swapWith] = temp;
+        }
+
+        // Размещаем черепахи
+        float prevX = -baseSpace;
+        for (int j = 0; j < objectsInRow; j++) {
+            turtles[turtleIndex].y = row * (HEIGHT / CELLS_Y);
+            turtles[turtleIndex].speed = speed;
+            turtles[turtleIndex].direction = directions[i];
+            turtles[turtleIndex].width = (GAME_WIDTH / CELLS_X) * widths[i];
+            turtles[turtleIndex].state = 0;
+            turtles[turtleIndex].phase = 0;
+            turtles[turtleIndex].timer = 0.0f;
+            turtles[turtleIndex].phaseTimer = (float)(rand() % 2000) / 1000.0f;
+            turtles[turtleIndex].isDiving = divingIndices[j];
+
+            // Вычисляем позицию с рандомным смещением
+            float randomOffset = (j != 0) ? (rand() % (int)(baseSpace * 100)) / 100.0f - baseSpace / 2 : 0;
+            turtles[turtleIndex].x = prevX + baseSpace + ((j != 0) ? turtles[turtleIndex].width : 0) + randomOffset;
+            prevX = turtles[turtleIndex].x;
+
+            turtleIndex++;
+        }
+
+        free(divingIndices);
+
+        // Вычисляем правую границу зацикливания для ряда
+        float rightBoundary = turtles[turtleIndex - 1].x;
+        rightBoundary = (rightBoundary < GAME_WIDTH) ? GAME_WIDTH : rightBoundary;
+
+        // Сохраняем границу для всех черепах в ряду
+        for (int j = 0; j < objectsInRow; j++) {
+            turtles[turtleIndex - j - 1].rightBoundary = rightBoundary;
+        }
+    }
+}
+
+void initHomes(Home* homes) {
+    int cellwidth = GAME_WIDTH / CELLS_X;
+
+    homes[0].x = cellwidth * 2.5f;
+    homes[1].x = cellwidth * 6;
+    homes[2].x = cellwidth * 9.5f;
+    homes[3].x = cellwidth * 13;
+    homes[4].x = cellwidth * 16.5f;
+
+    for (int i = 0; i < MAX_HOMES_COUNT; i++) {
+        homes[i].y = 0; // Верхний ряд
+        homes[i].state = 0;
+        homes[i].animTimer = 0.0f;
+    }
+}
+
+void initLawnmower(Lawnmower* lawnmower, int num) {
+    if (num == 1) {
+        lawnmower->x = 0;
+        lawnmower->y = 7 * (HEIGHT / CELLS_Y);
+        lawnmower->startY = 7 * (HEIGHT / CELLS_Y);
+        lawnmower->speed = lawnmower1Speed + (rand() % 101);
+        lawnmower->direction = 1;
+        lawnmower->texture = lawnmowerTex;
+        lawnmower->changeRowTimer = 0.0f;
+        lawnmower->currentRow = 7;
+        lawnmower->isChangingRow = 0;
+        lawnmower->changeRowProgress = 0.0f;
+        lawnmower->targetY = 7 * (HEIGHT / CELLS_Y);
+        lawnmower->rotationAngle = 0.0f;
+        lawnmower->rotationDirection = 1;
+        lawnmower->rowChangeSpeedFactor = 0.3f;
+        lawnmower->isActive = 1;
+    }
+    else if (num == 2) {
+        lawnmower->isActive = (currentLevel >= 10);
+        if (lawnmower->isActive) {
+            lawnmower->x = GAME_WIDTH - GAME_WIDTH / CELLS_X;
+            lawnmower->y = 8 * (HEIGHT / CELLS_Y);
+            lawnmower->startY = 8 * (HEIGHT / CELLS_Y);
+            lawnmower->speed = lawnmower2Speed + (rand() % 101);
+            lawnmower->direction = -1;
+            lawnmower->texture = lawnmowerTex;
+            lawnmower->changeRowTimer = 0.0f;
+            lawnmower->currentRow = 8;
+            lawnmower->isChangingRow = 0;
+            lawnmower->changeRowProgress = 0.0f;
+            lawnmower->targetY = 8 * (HEIGHT / CELLS_Y);
+            lawnmower->rotationAngle = 0.0f;
+            lawnmower->rotationDirection = 1;
+            lawnmower->rowChangeSpeedFactor = 0.3f;
+        }
+    }
+}
+
+void initSnake(Snake* snake) {
+    snake->x = 0;
+    snake->y = 6 * (HEIGHT / CELLS_Y);
+    snake->speed = snakeSpeed + (rand() % 40);
+    snake->direction = 1;
+    snake->row = 6;
+    snake->texture = snakeTex;
+    snake->isActive = (currentLevel >= 5); // Активируем только с 5 уровня
+}
+
+void drawZonePreview(int startRow, ZoneType zone) {
+    int rowsToDraw = (zone == ZONE_LAWN) ? 2 : 1;
+
+    for (int r = 0; r < rowsToDraw; r++) {
+        int row = startRow + r;
+        if (row >= editor.cellsY) break;
+
+        for (int col = 0; col < editor.cellsX; col++) {
+            float x = col * editor.baseCellSize;
+            float y = row * editor.baseCellSize;
+
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 0); glVertex2f(x, y);
+            glTexCoord2f(1, 0); glVertex2f(x + editor.baseCellSize, y);
+            glTexCoord2f(1, 1); glVertex2f(x + editor.baseCellSize, y + editor.baseCellSize);
+            glTexCoord2f(0, 1); glVertex2f(x, y + editor.baseCellSize);
+            glEnd();
+        }
+    }
+}
+
+
+GLuint getTextureForObject(ObjectType type) {
+    switch (type) {
+    case OBJ_CAR1: return car1Tex;
+    case OBJ_CAR2: return car2Tex;
+    case OBJ_CAR3: return car3Tex;
+    case OBJ_CAR4: return car4Tex;
+    case OBJ_TRUCK: return truckTex;
+    case OBJ_LOG: return logMTex;
+    case OBJ_TURTLE: return turtle1Tex;
+    default: return 0;
+    }
+}
+
+void renderEditorObjects() {
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glColor3f(1, 1, 1);
+
+    for (int row = 0; row < editor.cellsY; row++) {
+        if (editor.rowSettings[row].objectType == OBJ_EMPTY) continue;
+
+        float cellSize = editor.baseCellSize;
+        float yPos = row * cellSize + cellSize / 2 - 30; // Центрируем по вертикали
+        float fieldWidth = editor.cellsX * cellSize;
+
+        int direction = editor.rowSettings[row].direction;
+        int quantity = editor.rowSettings[row].quantity;
+        int length = editor.rowSettings[row].length;
+        float objectWidth = cellSize * length;
+
+        // Определяем позицию для отрисовки (лево/право в зависимости от направления)
+        float xPos;
+        if (editor.rowSettings[row].objectType == OBJ_LOG || editor.rowSettings[row].objectType == OBJ_TURTLE) {
+            xPos = (fieldWidth - objectWidth) / 2;
+        }
+        else {
+            xPos = (direction == 1) ? 0 : (fieldWidth - objectWidth);
+        }
+
+        // Рисуем объекты в зависимости от типа
+        switch (editor.rowSettings[row].objectType) {
+        case OBJ_SNAKE:
+            glBindTexture(GL_TEXTURE_2D, snakeTex);
+            drawQuad((xPos - editor.panX - editor.viewOffsetX) / editor.zoomFactor,
+                (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor,
+                cellSize * 2 / editor.zoomFactor, cellSize / editor.zoomFactor,
+                direction == 1);
+            break;
+
+        case OBJ_LAWNMOWER: {
+            int i = 0;
+            while (editor.zoneTypes[row - i] == ZONE_LAWN) i++;
+
+            if (i % 2 != 0) {
+                if (quantity == 1) {
+                    glBindTexture(GL_TEXTURE_2D, lawnmowerTex);
+                    drawQuad((xPos + ((direction == 1) ? 0 : cellSize) - editor.panX - editor.viewOffsetX) / editor.zoomFactor,
+                        (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor,
+                        cellSize / editor.zoomFactor, cellSize / editor.zoomFactor,
+                        direction == 1);
+                }
+                else if (quantity == 2) {
+                    // Первая газонокосилка слева
+                    glBindTexture(GL_TEXTURE_2D, lawnmowerTex);
+                    drawQuad((0 - editor.panX - editor.viewOffsetX) / editor.zoomFactor,
+                        (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor,
+                        cellSize / editor.zoomFactor, cellSize / editor.zoomFactor,
+                        1);
+
+                    // Вторая газонокосилка справа
+                    drawQuad((fieldWidth - cellSize - editor.panX - editor.viewOffsetX) / editor.zoomFactor,
+                        (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor,
+                        cellSize / editor.zoomFactor, cellSize / editor.zoomFactor,
+                        0);
+                }
+            }
+            break;
+        }
+        case OBJ_LOG: {
+            // Рендеринг бревна с сегментами
+            float segmentX = xPos;
+
+            // Левый конец
+            glBindTexture(GL_TEXTURE_2D, logLTex);
+            drawQuad((segmentX - editor.panX - editor.viewOffsetX) / editor.zoomFactor, 
+                (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor, 
+                cellSize / editor.zoomFactor, cellSize / editor.zoomFactor,
+                0);
+            segmentX += cellSize;
+
+            // Средние части (если длина > 2)
+            if (length > 2) {
+                glBindTexture(GL_TEXTURE_2D, logMTex);
+                for (int i = 0; i < length - 2; i++) {
+                    drawQuad((segmentX - editor.panX - editor.viewOffsetX) / editor.zoomFactor, 
+                        (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor, 
+                        cellSize / editor.zoomFactor, cellSize / editor.zoomFactor, 
+                        0);
+                    segmentX += cellSize;
+                }
+            }
+
+            // Правый конец
+            glBindTexture(GL_TEXTURE_2D, logRTex);
+            drawQuad((segmentX - editor.panX - editor.viewOffsetX) / editor.zoomFactor,
+                (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor,
+                cellSize / editor.zoomFactor, cellSize / editor.zoomFactor,
+                0);
+            break;
+        }
+        case OBJ_TURTLE: {
+            // Рендерим N черепах подряд
+            glBindTexture(GL_TEXTURE_2D, turtle1Tex);
+            for (int i = 0; i < length; i++) {
+                float offset = i * cellSize;
+                drawQuad((xPos + offset - editor.panX - editor.viewOffsetX) / editor.zoomFactor, 
+                    (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor, 
+                    cellSize / editor.zoomFactor, cellSize / editor.zoomFactor, 
+                    direction == 1);
+            }
+            break;
+        }
+        default: // Для машин, бревен и черепах
+            glBindTexture(GL_TEXTURE_2D, getTextureForObject(editor.rowSettings[row].objectType));
+            float width = (editor.rowSettings[row].objectType == OBJ_TRUCK) ?
+                cellSize * 2 : cellSize;
+
+            // Рисуем по центру
+            drawQuad((fieldWidth / 2 - width / 2 - editor.panX - editor.viewOffsetX) / editor.zoomFactor,
+                (yPos - editor.panY - editor.viewOffsetY) / editor.zoomFactor,
+                width / editor.zoomFactor, cellSize / editor.zoomFactor,
+                direction == 1);
+            break;
+        }
+    }
+    glDisable(GL_BLEND);
+    glDisable(GL_TEXTURE_2D);
+}
+
+void renderEditorPreview() {
+    if (!isCursorInEditorField || editorMode == EDITOR_MODE_NONE) return;
+
+    // Преобразуем координаты с учетом панорамирования и зума
+    float worldX = (cursorX - editor.panX - editor.viewOffsetX) / editor.zoomFactor;
+    float worldY = (cursorY - editor.panY - editor.viewOffsetY) / editor.zoomFactor;
+
+    int hoveredCol = (int)(worldX / editor.baseCellSize);
+    int hoveredRow = (int)(worldY / editor.baseCellSize);
+
+    if (hoveredCol < 0 || hoveredCol >= editor.cellsX ||
+        hoveredRow < 0 || hoveredRow >= editor.cellsY) return;
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    switch (editorMode) {
+    case EDITOR_MODE_HOME: {
+        // Проверяем, можно ли разместить домик в этой позиции (верхний ряд)
+        int isValid = (editor.zoneTypes[hoveredRow] == ZONE_WATER && 
+            editor.rowSettings[hoveredRow].objectType == OBJ_EMPTY);
+
+        // Рисуем полупрозрачный домик
+        if (homeEmptyTex) {
+            glBindTexture(GL_TEXTURE_2D, homeEmptyTex);
+            glColor4f(1.0f, 1.0f, 1.0f, 0.6f);
+            float x = hoveredCol * editor.baseCellSize;
+            float y = hoveredRow * editor.baseCellSize;
+            drawQuad(x, y, editor.baseCellSize, editor.baseCellSize, 0);
+
+            // Если позиция невалидна - рисуем красный поверх
+            if (!isValid) {
+                glDisable(GL_TEXTURE_2D);
+                glColor4f(1.0f, 0.0f, 0.0f, 0.4f);
+                glBegin(GL_QUADS);
+                glVertex2f(x, y);
+                glVertex2f(x + editor.baseCellSize, y);
+                glVertex2f(x + editor.baseCellSize, y + editor.baseCellSize);
+                glVertex2f(x, y + editor.baseCellSize);
+                glEnd();
+                glEnable(GL_TEXTURE_2D);
+            }
+        }
+        break;
+    }
+
+    case EDITOR_MODE_SPAWN: {
+        // Проверяем валидность позиции (нижний ряд)
+        int isValid = (editor.zoneTypes[hoveredRow] == ZONE_GRASS && 
+            editor.rowSettings[hoveredRow].objectType == OBJ_EMPTY);
+
+        // Рисуем полупрозрачную лягушку
+        if (frogTex) {
+            glBindTexture(GL_TEXTURE_2D, frogTex);
+            glColor4f(1.0f, 1.0f, 1.0f, 0.6f);
+            float x = hoveredCol * editor.baseCellSize;
+            float y = hoveredRow * editor.baseCellSize;
+            drawQuad(x + 4, y + 4, editor.baseCellSize - 8, editor.baseCellSize - 8, 0);
+
+            if (!isValid) {
+                glDisable(GL_TEXTURE_2D);
+                glColor4f(1.0f, 0.0f, 0.0f, 0.4f);
+                glBegin(GL_QUADS);
+                glVertex2f(x, y);
+                glVertex2f(x + editor.baseCellSize, y);
+                glVertex2f(x + editor.baseCellSize, y + editor.baseCellSize);
+                glVertex2f(x, y + editor.baseCellSize);
+                glEnd();
+                glEnable(GL_TEXTURE_2D);
+            }
+        }
+        break;
+    }
+
+    case EDITOR_MODE_DELETE: {
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glColor4f(1.0f, 0.0f, 0.0f, 0.3f);
+
+        // 1. Проверка домиков
+        int hoveredHome = -1;
+        for (int i = 0; i < MAX_HOMES_COUNT; i++) {
+            if (!homePositions[i].isHouseExist) continue;
+
+            // Проверяем попадание курсора
+            if (fabs(worldX - homePositions[i].homeX) < editor.baseCellSize / 2 &&
+                fabs(worldY - homePositions[i].homeY) < editor.baseCellSize / 2) {
+                hoveredHome = i;
+                break;
+            }
+        }
+
+        // 2. Проверка спавна
+        int hoveredSpawn = 0;
+        if (spawnX > 0 && spawnY > 0) {
+            if (fabs(worldX - spawnX) < editor.baseCellSize / 2 &&
+                fabs(worldY - spawnY) < editor.baseCellSize / 2) {
+                hoveredSpawn = 1;
+            }
+        }
+
+        // 3. Приоритет объектов над зонами
+        if (hoveredHome >= 0 || hoveredSpawn) {
+            // Подсветка объекта
+            if (hoveredHome >= 0) {
+                // Рассчитываем координаты домика
+                float x = homePositions[hoveredHome].homeX - editor.baseCellSize / 2;
+                float y = homePositions[hoveredHome].homeY - editor.baseCellSize / 2;
+                glBegin(GL_QUADS);
+                glVertex2f(x, y);
+                glVertex2f(x + editor.baseCellSize, y);
+                glVertex2f(x + editor.baseCellSize, y + editor.baseCellSize);
+                glVertex2f(x, y + editor.baseCellSize);
+                glEnd();
+            }
+            else {
+                // Подсветка спавна
+                float x = spawnX - editor.baseCellSize / 2;
+                float y = spawnY - editor.baseCellSize / 2;
+                glBegin(GL_QUADS);
+                glVertex2f(x, y);
+                glVertex2f(x + editor.baseCellSize, y);
+                glVertex2f(x + editor.baseCellSize, y + editor.baseCellSize);
+                glVertex2f(x, y + editor.baseCellSize);
+                glEnd();
+            }
+        }
+        else {
+            // Подсветка зоны
+            int rowsToHighlight = 1;
+            int i = 0;
+            if (editor.zoneTypes[hoveredRow] == ZONE_LAWN) {
+                rowsToHighlight = 2;
+                while (editor.zoneTypes[hoveredRow - i] == ZONE_LAWN) i++;
+            }
+
+
+            for (int r = 0; r < rowsToHighlight; r++) {
+                int row = hoveredRow + r - 2 * r * (i % 2 == 0);
+                if (row >= editor.cellsY) break;
+
+                float y = row * editor.baseCellSize;
+                glBegin(GL_QUADS);
+                glVertex2f(0, y);
+                glVertex2f(editor.fieldWidth / editor.zoomFactor, y);
+                glVertex2f(editor.fieldWidth / editor.zoomFactor, y + editor.baseCellSize);
+                glVertex2f(0, y + editor.baseCellSize);
+                glEnd();
+            }
+        }
+
+        glDisable(GL_BLEND);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glEnable(GL_TEXTURE_2D);
+        break;
+    }
+
+    case EDITOR_MODE_OPTIONS: {
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glColor4f(0.0f, 0.0f, 1.0f, 0.5f);
+
+        int isExistObj = 0;
+        for (int i = 0; i < editor.cellsX; i++) {
+            for (int j = 0; j < MAX_HOMES_COUNT; j++) {
+                if (!homePositions[j].isHouseExist) {
+                    continue;
+                }
+                if (fabs(homePositions[j].homeX - i * editor.baseCellSize - 1) < editor.baseCellSize / 2 &&
+                    fabs(homePositions[j].homeY - hoveredRow * editor.baseCellSize - 1) < editor.baseCellSize / 2) {
+                    isExistObj = 1;
+                    break;
+                }
+            }
+            if (fabs(spawnX - i * editor.baseCellSize - 1) < editor.baseCellSize / 2 &&
+                fabs(spawnY - hoveredRow * editor.baseCellSize - 1) < editor.baseCellSize / 2) {
+                isExistObj = 1;
+                break;
+            }
+        }
+
+        // Подсветка зоны
+        int rowsToHighlight = 1;
+        int i = 0;
+        if (editor.zoneTypes[hoveredRow] == ZONE_LAWN) {
+            rowsToHighlight = 2;
+            while (editor.zoneTypes[hoveredRow - i] == ZONE_LAWN) i++;
+        }
+
+        if (editor.zoneTypes[hoveredRow] != ZONE_NONE && !isExistObj) {
+            for (int r = 0; r < rowsToHighlight; r++) {
+                int row = hoveredRow + r - 2 * r * (i % 2 == 0);;
+                if (row >= editor.cellsY) break;
+
+                float y = row * editor.baseCellSize;
+                glBegin(GL_QUADS);
+                glVertex2f(0, y);
+                glVertex2f(editor.fieldWidth / editor.zoomFactor, y);
+                glVertex2f(editor.fieldWidth / editor.zoomFactor, y + editor.baseCellSize);
+                glVertex2f(0, y + editor.baseCellSize);
+                glEnd();
+            }
+        }
+        else if (isExistObj || editor.zoneTypes[hoveredRow] == ZONE_NONE) { // нельзя
+            glColor4f(1.0f, 0.0f, 0.0f, 0.3f);
+            for (int r = 0; r < rowsToHighlight; r++) {
+                int row = hoveredRow + r - 2 * r * (i % 2 == 0);;
+                if (row >= editor.cellsY) break;
+
+                float y = row * editor.baseCellSize;
+                glBegin(GL_QUADS);
+                glVertex2f(0, y);
+                glVertex2f(editor.fieldWidth / editor.zoomFactor, y);
+                glVertex2f(editor.fieldWidth / editor.zoomFactor, y + editor.baseCellSize);
+                glVertex2f(0, y + editor.baseCellSize);
+                glEnd();
+            }
+        }
+
+        glDisable(GL_BLEND);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glEnable(GL_TEXTURE_2D);
+        break;
+    }
+
+    case EDITOR_MODE_ZONE: {
+        glEnable(GL_TEXTURE_2D);
+        int isValid = isZonePlacementValid(selectedZone, hoveredRow);
+        GLuint previewTex = 0;
+
+        // Основная текстура зоны
+        switch (selectedZone) {
+        case ZONE_GRASS: previewTex = groundTex; break;
+        case ZONE_ROAD: previewTex = roadTex; break;
+        case ZONE_LAWN: previewTex = lawnTex; break;
+        case ZONE_WATER: previewTex = waterTex; break;
+        }
+
+        if (previewTex && invalidPatternTex) {
+            glEnable(GL_BLEND);
+
+            // 1. Отрисовка основной полупрозрачной текстуры
+            glColor4f(1.0f, 1.0f, 1.0f, 0.4f);
+            glBindTexture(GL_TEXTURE_2D, previewTex);
+            drawZonePreview(hoveredRow, selectedZone);
+
+            // 2. Отрисовка штриховки для невалидных зон
+            if (!isValid) {
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glColor4f(1.0f, 0.0f, 0.0f, 1); // Красный цвет
+                glBindTexture(GL_TEXTURE_2D, invalidPatternTex);
+                drawZonePreview(hoveredRow, selectedZone);
+            }
+
+            glDisable(GL_BLEND);
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+        break;
+    }
+    }
+
+    glDisable(GL_BLEND);
+    glColor3f(1.0f, 1.0f, 1.0f);
+}
+
+void renderEditorField() {
+    // 1. Очистка буфера
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // 2. Отрисовка статичного фона (только игровая область)
+    if (backgroundTex) {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, backgroundTex);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(0, 0);
+        glTexCoord2f(1, 0); glVertex2f(GAME_WIDTH, 0);
+        glTexCoord2f(1, 1); glVertex2f(GAME_WIDTH, HEIGHT);
+        glTexCoord2f(0, 1); glVertex2f(0, HEIGHT);
+        glEnd();
+    }
+
+    // 4. Применяем трансформации только к игровому полю
+    glTranslatef(editor.viewOffsetX + editor.panX, editor.viewOffsetY + editor.panY, 0);
+    glScalef(editor.zoomFactor, editor.zoomFactor, 1.0f);
+
+
+    // 5. Отрисовка белого фона ячеек
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_QUADS);
+    glVertex2f(0, 0);
+    glVertex2f(editor.fieldWidth / editor.zoomFactor, 0);
+    glVertex2f(editor.fieldWidth / editor.zoomFactor, editor.fieldHeight / editor.zoomFactor);
+    glVertex2f(0, editor.fieldHeight / editor.zoomFactor);
+    glEnd();
+
+    glEnable(GL_TEXTURE_2D);
+
+    for (int row = 0; row < editor.cellsY; row++) {
+        GLuint tex = 0;
+        switch (editor.zoneTypes[row]) {
+        case ZONE_GRASS: tex = groundTex; break;
+        case ZONE_ROAD: tex = roadTex; break;
+        case ZONE_LAWN: tex = lawnTex; break;
+        case ZONE_WATER: tex = waterTex; break;
+        }
+
+        if (tex) {
+            glBindTexture(GL_TEXTURE_2D, tex);
+            for (int col = 0; col < editor.cellsX; col++) {
+                float x = col * editor.baseCellSize;
+                float y = row * editor.baseCellSize;
+                drawQuad(x, y, editor.baseCellSize, editor.baseCellSize, 0);
+            }
+        }
+    }
+    renderEditorPreview();
+
+    glEnable(GL_BLEND);
+
+    // Отрисовка домиков
+    if (homeEmptyTex) {
+        glBindTexture(GL_TEXTURE_2D, homeEmptyTex);
+        for (int i = 0; i < MAX_HOMES_COUNT; i++) {
+            if (homePositions[i].homeX) {
+                drawQuad(homePositions[i].homeX - editor.baseCellSize / 2,
+                    homePositions[i].homeY - editor.baseCellSize / 2,
+                    editor.baseCellSize,
+                    editor.baseCellSize, 0);
+            }
+        }
+    }
+
+    // Отрисовка точки спавна
+    if (frogTex && spawnX > 0 && spawnY > 0) {
+        glBindTexture(GL_TEXTURE_2D, frogTex);
+        drawQuad(spawnX - editor.baseCellSize / 2 + 4,
+            spawnY - editor.baseCellSize / 2 + 4,
+            editor.baseCellSize - 8,
+            editor.baseCellSize - 8, 0);
+    }
+
+    glDisable(GL_BLEND);
+
+    glDisable(GL_TEXTURE_2D);
+    // 6. Отрисовка сетки
+    glColor4f(0.7f, 0.7f, 0.7f, 1.0f);
+    float lineWidth = 1.0f / editor.zoomFactor;
+    lineWidth = fmaxf(0.25f, fminf(2.0f, lineWidth)); // Ограничиваем толщину
+    glLineWidth(lineWidth);
+
+    // Вертикальные линии
+    for (int i = 0; i <= editor.cellsX; i++) {
+        float x = i * editor.baseCellSize;
+        glBegin(GL_LINES);
+        glVertex2f(x, 0);
+        glVertex2f(x, editor.fieldHeight / editor.zoomFactor);
+        glEnd();
+    }
+
+    // Горизонтальные линии
+    for (int i = 0; i <= editor.cellsY; i++) {
+        float y = i * editor.baseCellSize;
+        glBegin(GL_LINES);
+        glVertex2f(0, y);
+        glVertex2f(editor.fieldWidth / editor.zoomFactor, y);
+        glEnd();
+    }
+
+    glEnable(GL_TEXTURE_2D);
+
+    // Сохраняем текущую матрицу
+    glPushMatrix();
+
+    // Применяем трансформации редактора
+    glTranslatef(editor.viewOffsetX + editor.panX, editor.viewOffsetY + editor.panY, 0);
+    glScalef(editor.zoomFactor, editor.zoomFactor, 1.0f);
+
+    // Отрисовываем объекты
+    renderEditorObjects();
+
+    // Восстанавливаем матрицу
+    glPopMatrix();
+
+
+    // 8. Отрисовка UI панели (с отдельной проекцией)
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, WIDTH, HEIGHT, 0, -1, 1); // На весь экран
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    if (infoPanelTex) {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, infoPanelTex);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(GAME_WIDTH, 0);
+        glTexCoord2f(1, 0); glVertex2f(WIDTH, 0);
+        glTexCoord2f(1, 1); glVertex2f(WIDTH, HEIGHT);
+        glTexCoord2f(0, 1); glVertex2f(GAME_WIDTH, HEIGHT);
+        glEnd();
+    }
+
+}
+
+void renderEditorUI() {
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    // Отображение информации о размере уровня
+    char sizeText[50];
+    snprintf(sizeText, sizeof(sizeText), "Level size: %dx%d", editor.cellsX, editor.cellsY);
+
+    // Отображение текущего масштаба
+    char zoomText[32];
+    snprintf(zoomText, sizeof(zoomText), "Zoom: %.0f%%", editor.zoomFactor * 100);
+
+    // 1. Верхняя часть (300px) - информация
+    // Размер уровня
+    glRasterPos2i(GAME_WIDTH + 50, 50);
+    for (char* c = sizeText; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    // Масштаб
+    glRasterPos2i(GAME_WIDTH + 50, 90);
+    for (char* c = zoomText; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    // 2. Средняя часть (600px) - кнопки (2x3)
+    int buttonWidth = 140;
+    int buttonHeight = 140;
+    int startY = 180;
+    int margin = 40;
+
+    // Первый ряд: Copy-Paste и Delete (подняты на buttonHeight + margin)
+    if (optionButtonTex) {
+        if (editorMode == EDITOR_MODE_OPTIONS) {
+            glColor3f(0.7f, 1.0f, 0.7f); // Подсветка активной кнопки
+        }
+        glBindTexture(GL_TEXTURE_2D, optionButtonTex);
+        drawQuad(GAME_WIDTH + margin, startY, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f); // Восстанавливаем цвет
+    }
+
+    if (deleteButtonTex) {
+        if (editorMode == EDITOR_MODE_DELETE) {
+            glColor3f(0.7f, 1.0f, 0.7f); // Подсветка активной кнопки
+        }
+        glBindTexture(GL_TEXTURE_2D, deleteButtonTex);
+        drawQuad(GAME_WIDTH + margin * 2 + buttonWidth, startY, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f); // Восстанавливаем цвет
+    }
+
+    // Второй ряд: Home и Spawn (новые кнопки)
+    if (homeButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, homeButtonTex);
+        if (editorMode == EDITOR_MODE_HOME) {
+            glColor3f(0.7f, 1.0f, 0.7f); // Подсветка активной кнопки
+        }
+        drawQuad(GAME_WIDTH + margin, startY + buttonHeight + margin, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+
+    if (spawnButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, spawnButtonTex);
+        if (editorMode == EDITOR_MODE_SPAWN) {
+            glColor3f(0.7f, 1.0f, 0.7f); // Подсветка активной кнопки
+        }
+        drawQuad(GAME_WIDTH + margin * 2 + buttonWidth, startY + buttonHeight + margin, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+
+    // Третий ряд: Grass и Road
+    if (grassButtonTex) {
+        if (selectedZone == ZONE_GRASS) {
+            glColor3f(0.7f, 1.0f, 0.7f); // Подсветка выбранной кнопки
+        }
+        glBindTexture(GL_TEXTURE_2D, grassButtonTex);
+        drawQuad(GAME_WIDTH + margin, startY + (buttonHeight + margin) * 2, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+
+    if (roadButtonTex) {
+        if (selectedZone == ZONE_ROAD) {
+            glColor3f(0.7f, 1.0f, 0.7f);
+        }
+        glBindTexture(GL_TEXTURE_2D, roadButtonTex);
+        drawQuad(GAME_WIDTH + margin * 2 + buttonWidth, startY + (buttonHeight + margin) * 2, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+
+    // Четвертый ряд: Lawn и Water
+    if (lawnButtonTex) {
+        if (selectedZone == ZONE_LAWN) {
+            glColor3f(0.7f, 1.0f, 0.7f);
+        }
+        glBindTexture(GL_TEXTURE_2D, lawnButtonTex);
+        drawQuad(GAME_WIDTH + margin, startY + (buttonHeight + margin) * 3, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+
+    if (waterButtonTex) {
+        if (selectedZone == ZONE_WATER) {
+            glColor3f(0.7f, 1.0f, 0.7f);
+        }
+        glBindTexture(GL_TEXTURE_2D, waterButtonTex);
+        drawQuad(GAME_WIDTH + margin * 2 + buttonWidth, startY + (buttonHeight + margin) * 3, buttonWidth, buttonHeight, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+
+    // options-меню
+    if (editor.isOptionsMenuOpen && editorOptionsMenuTex) {
+
+        if (editor.optionsMenuPosX > GAME_WIDTH / 2) {
+            glBindTexture(GL_TEXTURE_2D, spawnButtonTex);
+            drawQuad(editor.optionsMenuPosX - 85, editor.optionsMenuPosY + 815, 70, 70, 0);
+        }
+        else {
+            glBindTexture(GL_TEXTURE_2D, spawnButtonTex);
+            drawQuad(editor.optionsMenuPosX + 415, editor.optionsMenuPosY + 815, 70, 70, 0);
+        }
+
+        glBindTexture(GL_TEXTURE_2D, editorOptionsMenuTex);
+        drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY, 400, 900, 0);
+
+        if (editor.isOptionsMenuOpen && editorOptionsMenuTex) {
+            glBindTexture(GL_TEXTURE_2D, editorOptionsMenuTex);
+            drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY, 400, 900, 0);
+
+            // Массив полей для отрисовки
+            const struct {
+                int fieldId;
+                float x, y;
+                const char* value;
+            } fieldsToDraw[] = {
+                {1, 125, 110, editorOptions.focusedInputField == 1 ? editorOptions.inputBuffer : ""},  // Количество
+                {2, 125, 210, editorOptions.focusedInputField == 2 ? editorOptions.inputBuffer : ""},  // Длина
+                {3, 120, 410, editorOptions.focusedInputField == 3 ? editorOptions.inputBuffer : ""},  // Нач. скорость 1
+                {4, 260, 410, editorOptions.focusedInputField == 4 ? editorOptions.inputBuffer : ""},  // Нач. скорость 2
+                {5, 120, 510, editorOptions.focusedInputField == 5 ? editorOptions.inputBuffer : ""},  // Уровни скорости 1
+                {6, 260, 510, editorOptions.focusedInputField == 6 ? editorOptions.inputBuffer : ""},  // Уровни скорости 2
+                {7, 120, 610, editorOptions.focusedInputField == 7 ? editorOptions.inputBuffer : ""},  // Пов. скорости 1
+                {8, 260, 610, editorOptions.focusedInputField == 8 ? editorOptions.inputBuffer : ""},  // Пов. скорости 2
+                {9, 190, 710, editorOptions.focusedInputField == 9 ? editorOptions.inputBuffer : ""},  // Уровни количества
+                {10, 190, 810, editorOptions.focusedInputField == 10 ? editorOptions.inputBuffer : ""} // Пов. количества
+            };
+
+            for (size_t i = 0; i < sizeof(fieldsToDraw) / sizeof(fieldsToDraw[0]); i++) {
+                char displayText[32] = "";
+
+                if (editorOptions.focusedInputField == fieldsToDraw[i].fieldId) {
+                    if (editorOptions.isValueHidden) {
+                        // Поле в фокусе, но значение скрыто - ничего не показываем
+                        displayText[0] = '\0';
+                    }
+                    else {
+                        // Показываем вводимый текст
+                        strcpy(displayText, editorOptions.inputBuffer);
+                    }
+                }
+                else {
+                    // Получаем сохранённое значение
+                    switch (fieldsToDraw[i].fieldId) {
+                    case 1: sprintf(displayText, "%d", editorOptions.quantity); break;
+                    case 2: sprintf(displayText, "%d", editorOptions.length); break;
+                    case 3: sprintf(displayText, "%.1f", editorOptions.initialSpeed1); break;
+                    case 4: sprintf(displayText, "%.1f", editorOptions.initialSpeed2); break;
+                    case 5: sprintf(displayText, "%d", editorOptions.speedLevels1); break;
+                    case 6: sprintf(displayText, "%d", editorOptions.speedLevels2); break;
+                    case 7: sprintf(displayText, "%.1f", editorOptions.speedIncrease1); break;
+                    case 8: sprintf(displayText, "%.1f", editorOptions.speedIncrease2); break;
+                    case 9: sprintf(displayText, "%d", editorOptions.countLevels); break;
+                    case 10: sprintf(displayText, "%d", editorOptions.countIncrease); break;
+                    }
+                }
+
+                drawText(displayText,
+                    editor.optionsMenuPosX + fieldsToDraw[i].x + 10,
+                    fieldsToDraw[i].y + 40);
+            }
+
+            glEnable(GL_TEXTURE_2D);
+
+            if (isDirLeftPressed && buttonDirectionLeftTex) {
+                glBindTexture(GL_TEXTURE_2D, buttonDirectionLeftTex);
+                drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY, 400, 900, 0);
+            }
+
+            if (isDirRightPressed && buttonDirectionRightTex) {
+                glBindTexture(GL_TEXTURE_2D, buttonDirectionRightTex);
+                drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY, 400, 900, 0);
+            }
+
+            // Отрисовка предпросмотра выбранного объекта
+            if (objectPreviewTextures[selectedObjectType]) {
+                glBindTexture(GL_TEXTURE_2D, objectPreviewTextures[selectedObjectType]);
+                drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY,
+                    400, 900, 0);
+
+                if (editorOptions.quantity || selectedObjectType == OBJ_EMPTY && !editorOptions.quantity) {
+                    if (objectAllowedOptions[selectedObjectType] == editorOptionsNotAllowedOneLawnmower && editorOptions.quantity == 2) {
+                        objectAllowedOptions[selectedObjectType] = editorOptionsNotAllowedTwoLawnmowers;
+                    }
+                    else if (objectAllowedOptions[selectedObjectType] == editorOptionsNotAllowedTwoLawnmowers && editorOptions.quantity == 1) {
+                        objectAllowedOptions[selectedObjectType] = editorOptionsNotAllowedOneLawnmower;
+                    }
+
+
+                    // отрисовка не разрешаемых кнопок
+                    glBindTexture(GL_TEXTURE_2D, objectAllowedOptions[selectedObjectType]);
+                    drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY,
+                        400, 900, 0);
+                }
+                else {
+
+                    // Проверяем, можно ли разместить объект на текущей зоне
+                    int isAllowed = isObjectAllowedForZone(selectedObjectType, editor.zoneTypes[editor.selectedZoneRow]);
+
+                    // отрисовка не разрешаемых кнопок при нулевом количестве
+                    if (!isAllowed) {
+                        glBindTexture(GL_TEXTURE_2D, editorOptionsNotAllowedEmpty);
+                        drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY,
+                            400, 900, 0);
+                    }
+                    else {
+                        glBindTexture(GL_TEXTURE_2D, editorOptionsNotAllowedZeroQuantity);
+                        drawQuad(editor.optionsMenuPosX, editor.optionsMenuPosY,
+                            400, 900, 0);
+                    }
+                }
+            }
+
+            // Проверяем, можно ли разместить объект на текущей зоне
+            int isAllowed = isObjectAllowedForZone(selectedObjectType, editor.zoneTypes[editor.selectedZoneRow]);
+
+            if (invalidPatternTex) {
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glBindTexture(GL_TEXTURE_2D, invalidPatternTex);
+                // Если объект нельзя разместить - рисуем поверх invalid_pattern + над кнопкой сохранения
+                if (!isAllowed) {
+                    drawQuad(editor.optionsMenuPosX + 205, editor.optionsMenuPosY + 5, 90, 90, 0);
+                }
+                if (!isAllowed ||
+                    editorOptions.quantity == 0 && selectedObjectType != OBJ_EMPTY ||
+                    !isDirLeftPressed && !isDirRightPressed && !(selectedObjectType == OBJ_LAWNMOWER && editorOptions.quantity == 2)) {
+                    if (editor.optionsMenuPosX > GAME_WIDTH / 2) {
+                        drawQuad(editor.optionsMenuPosX - 85, editor.optionsMenuPosY + 815, 70, 70, 0);
+                    }
+                    else {
+                        drawQuad(editor.optionsMenuPosX + 415, editor.optionsMenuPosY + 815, 70, 70, 0);
+                    }
+                }
+                glDisable(GL_BLEND);
+            }
+
+            // Отрисовка названия типа
+            char* typeName = "Empty";
+
+            glDisable(GL_TEXTURE_2D);
+            glColor3f(1.0f, 1.0f, 1.0f);
+            if (isAllowed && selectedObjectType == OBJ_EMPTY) {
+                glRasterPos2i(editor.optionsMenuPosX + 225, editor.optionsMenuPosY + 55);
+                for (typeName; *typeName; typeName++) {
+                    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *typeName);
+                }
+            }
+        }
+
+
+        //
+        //
+        //
+        //
+        //
+        //
+    }
+
+    glDisable(GL_BLEND);
+    glEnable(GL_TEXTURE_2D);
+}
+
+void renderSlider(Slider slider, const char* label) {
+    // Отрисовка фона ползунка (с текстурой)
+    if (sliderBarTex) {
+        glBindTexture(GL_TEXTURE_2D, sliderBarTex);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(slider.x, slider.y - 5);
+        glTexCoord2f(1, 0); glVertex2f(slider.x + slider.width, slider.y - 5);
+        glTexCoord2f(1, 1); glVertex2f(slider.x + slider.width, slider.y + 5);
+        glTexCoord2f(0, 1); glVertex2f(slider.x, slider.y + 5);
+        glEnd();
+    }
+
+    if (slider.isDragging) {
+        glColor3f(1, 1, 1); // Желтый при перетаскивании (белый фильтр)
+    }
+    else {
+        glColor3f(0.8f, 0.8f, 0.8f); // Серый по умолчанию
+    }
+
+    // Отрисовка "бегунка" (с текстурой)
+    if (sliderHandleTex) {
+        glBindTexture(GL_TEXTURE_2D, sliderHandleTex);
+        float handleX = slider.x + slider.value * slider.width;
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(handleX - 20, slider.y - 20);
+        glTexCoord2f(1, 0); glVertex2f(handleX + 20, slider.y - 20);
+        glTexCoord2f(1, 1); glVertex2f(handleX + 20, slider.y + 20);
+        glTexCoord2f(0, 1); glVertex2f(handleX - 20, slider.y + 20);
+        glEnd();
+    }
+
+    // Отрисовка текста
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glRasterPos2i(slider.x - 70, slider.y + 5);
+    for (char* c = (char*)label; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    // Отрисовка текущего значения
+    char valueText[20];
+    int value = MIN_CELLS + (int)(slider.value * (MAX_CELLS_X - MIN_CELLS) + 0.5f);
+    snprintf(valueText, sizeof(valueText), "%d", value);
+    glRasterPos2i(slider.x + slider.width + 20, slider.y + 5);
+    for (char* c = valueText; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+    glEnable(GL_TEXTURE_2D);
+}
+
+void renderLevelCreateDialog() {
+    // Сохраняем текущие настройки blending
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    GLint blendSrc, blendDst;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+
+    // Включаем blending с правильными параметрами для полупрозрачности
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Полупрозрачный темный фон
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.5f); // Теперь точно черный с прозрачностью 0.5
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(WIDTH, 0);
+    glVertex2i(WIDTH, HEIGHT);
+    glVertex2i(0, HEIGHT);
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1); // Восстанавливаем белый цвет для текстур
+
+    // Окно диалога (центрированное)
+    int dialogWidth = 500;
+    int dialogHeight = 300;
+    if (dialogWindowTex) {
+        glBindTexture(GL_TEXTURE_2D, dialogWindowTex);
+        drawQuad((WIDTH - dialogWidth) / 2, (HEIGHT - dialogHeight) / 2 - 50, dialogWidth, dialogHeight + 50, 0);
+    }
+
+    // Текст "Выберите размер"
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    drawTextCentered("Select level size:", (HEIGHT - dialogHeight) / 2 + 50);
+    glEnable(GL_TEXTURE_2D);
+
+    // Отрисовка ползунков
+    renderSlider(xSizeSlider, "Width");
+    renderSlider(ySizeSlider, "Height");
+
+    // Отрисовка кнопок Create и Cancel (симметрично)
+    int dialogX = (WIDTH - 500) / 2;
+    int dialogY = (HEIGHT - 300) / 2;
+
+    if (createButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, createButtonTex);
+        drawQuad(dialogX + 100, dialogY + 200, 120, 50, 0);  // Create слева
+    }
+
+    if (invalidPatternTex && !strlen(levelName)) {
+        glBindTexture(GL_TEXTURE_2D, invalidPatternTex);
+        drawQuad(dialogX + 100, dialogY + 200, 120, 50, 0);
+    }
+
+    if (cancelButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, cancelButtonTex);
+        drawQuad(dialogX + 280, dialogY + 200, 120, 50, 0);  // Cancel справа
+    }
+
+    if (strlen(levelName) > 0) {
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        char selectedLevelNameText[24];
+        sprintf(selectedLevelNameText, "\"%s\"", levelName);
+        drawTextCentered(selectedLevelNameText, (HEIGHT - dialogHeight) / 2);
+        glEnable(GL_TEXTURE_2D);
+    }
+    else {
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        char* selectedLevelNameText = "YOU HAVE TO NAME YOUR LEVEL";
+        drawTextCentered(selectedLevelNameText, (HEIGHT - dialogHeight) / 2);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glEnable(GL_TEXTURE_2D);
+    }
+
+    // Восстанавливаем предыдущие настройки blending
+    if (!blendEnabled) {
+        glDisable(GL_BLEND);
+    }
+    glBlendFunc(blendSrc, blendDst);
+}
+
+void renderLevelLoadDialog() {
+    // Сохраняем текущие настройки blending
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    GLint blendSrc, blendDst;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+
+    // Включаем blending для полупрозрачного фона
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Темный полупрозрачный фон
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(WIDTH, 0);
+    glVertex2i(WIDTH, HEIGHT);
+    glVertex2i(0, HEIGHT);
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1);
+
+    // Отрисовка окна диалога
+    int dialogWidth = 500;
+    int dialogHeight = 400;
+    if (dialogWindowTex) {
+        glBindTexture(GL_TEXTURE_2D, dialogWindowTex);
+        drawQuad((WIDTH - dialogWidth) / 2, (HEIGHT - dialogHeight) / 2, dialogWidth, dialogHeight, 0);
+    }
+
+    // Позиционирование элементов
+    int dialogX = (WIDTH - dialogWidth) / 2;
+    int dialogY = (HEIGHT - dialogHeight) / 2;
+    int yOffset = dialogY + 50;
+
+    // Отрисовка названия уровня
+    glDisable(GL_TEXTURE_2D);
+        char titleText[64];
+        snprintf(titleText, sizeof(titleText), "\"%s\"", levelName);
+        glColor3f(0.0f, 1.0f, 0.0f);
+        drawTextCentered("The level has been SUCCESSFULLY loaded:", yOffset - 8);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        drawTextCentered(titleText, yOffset + 27);
+    glEnable(GL_TEXTURE_2D);
+
+    // Кнопки (располагаем по центру с отступом)
+    yOffset += 50;
+    int buttonWidth = 200;
+    int buttonHeight = 50;
+    int buttonSpacing = 20;
+
+    // Play button
+    if (playTex) {
+        glBindTexture(GL_TEXTURE_2D, playTex);
+        drawQuad((WIDTH - buttonWidth) / 2, yOffset, buttonWidth, buttonHeight, 0);
+    }
+    yOffset += buttonHeight + buttonSpacing;
+
+    // Editor button
+    if (editorTex) {
+        glBindTexture(GL_TEXTURE_2D, editorTex);
+        drawQuad((WIDTH - buttonWidth) / 2, yOffset, buttonWidth, buttonHeight, 0);
+    }
+    yOffset += buttonHeight + buttonSpacing;
+
+    // Delete button
+    if (deleteTex) {
+        glBindTexture(GL_TEXTURE_2D, deleteTex);
+        drawQuad((WIDTH - buttonWidth) / 2, yOffset, buttonWidth, buttonHeight, 0);
+    }
+    yOffset += buttonHeight + buttonSpacing;
+
+    // Cancel button
+    if (cancelButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, cancelButtonTex);
+        drawQuad((WIDTH - buttonWidth) / 2, yOffset, buttonWidth, buttonHeight, 0);
+    }
+
+    // Восстанавливаем настройки blending
+    if (!blendEnabled) glDisable(GL_BLEND);
+    glBlendFunc(blendSrc, blendDst);
+}
+
+void renderLevelLoadError() {
+    // Фон
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(WIDTH, 0);
+    glVertex2i(WIDTH, HEIGHT);
+    glVertex2i(0, HEIGHT);
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1);
+
+    // Окно
+    int dialogWidth = 500;
+    int dialogHeight = 200;
+    if (dialogWindowTex) {
+        glBindTexture(GL_TEXTURE_2D, dialogWindowTex);
+        drawQuad((WIDTH - dialogWidth) / 2, (HEIGHT - dialogHeight) / 2, dialogWidth, dialogHeight, 0);
+    }
+
+    // Текст
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    drawTextCentered("LEVEL LOAD ERROR!", (HEIGHT - dialogHeight) / 2 + 50);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    drawTextCentered("Level doesn't exist or invalid name", (HEIGHT - dialogHeight) / 2 + 90);
+    glEnable(GL_TEXTURE_2D);
+
+    // Кнопка Cancel
+    if (cancelButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, cancelButtonTex);
+        drawQuad((WIDTH - 200) / 2, (HEIGHT + dialogHeight) / 2 - 70, 200, 50, 0);
+    }
+}
+
+void renderLevelDeleteConfirm() {
+    // Сохраняем текущие настройки blending
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    GLint blendSrc, blendDst;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+
+    // Включаем blending для полупрозрачного фона
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Полупрозрачный темный фон
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(WIDTH, 0);
+    glVertex2i(WIDTH, HEIGHT);
+    glVertex2i(0, HEIGHT);
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    // Отрисовка диалога
+    int dialogWidth = 500;
+    int dialogHeight = 300;
+    if (dialogWindowTex) {
+        glBindTexture(GL_TEXTURE_2D, dialogWindowTex);
+        drawQuad((WIDTH - dialogWidth) / 2, (HEIGHT - dialogHeight) / 2, dialogWidth, dialogHeight, 0);
+    }
+
+    // Текст подтверждения
+    glDisable(GL_TEXTURE_2D);
+    char levelNameQuotes[25];
+    sprintf(levelNameQuotes, "\"%s\"?", levelName);
+    glColor3f(1.0f, 0.0f, 0.0f);
+    drawTextCentered("Are you sure you want to DELETE level", (HEIGHT - dialogHeight) / 2 + 80);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    drawTextCentered(levelNameQuotes, (HEIGHT - dialogHeight) / 2 + 110);
+    glEnable(GL_TEXTURE_2D);
+
+    // Кнопки
+    int buttonY = (HEIGHT - dialogHeight) / 2 + 150;
+    if (deleteTex) {
+        glBindTexture(GL_TEXTURE_2D, deleteTex);
+        drawQuad((WIDTH - 200) / 2 - 110, buttonY, 200, 50, 0);
+    }
+    if (cancelButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, cancelButtonTex);
+        drawQuad((WIDTH - 200) / 2 + 110, buttonY, 200, 50, 0);
+    }
+
+    // Восстанавливаем настройки
+    if (!blendEnabled) glDisable(GL_BLEND);
+    glBlendFunc(blendSrc, blendDst);
+}
+
+void renderEditorExitDialog() {
+    // Сохраняем текущие настройки blending
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    GLint blendSrc, blendDst;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+
+    // Включаем blending с правильными параметрами для полупрозрачности
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Полупрозрачный темный фон
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.5f); // Теперь точно черный с прозрачностью 0.5
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(WIDTH, 0);
+    glVertex2i(WIDTH, HEIGHT);
+    glVertex2i(0, HEIGHT);
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1); // Восстанавливаем белый цвет для текстур
+
+    // Окно диалога (центрированное)
+    int dialogWidth = 300;
+    int dialogHeight = 550;
+
+    if (dialogWindowTex) {
+        glBindTexture(GL_TEXTURE_2D, dialogWindowTex);
+        drawQuad((WIDTH - dialogWidth) / 2, (HEIGHT - dialogHeight) / 2, dialogWidth, dialogHeight, 0);
+    }
+
+    int dialogX = (WIDTH - 300) / 2;
+    int dialogY = (HEIGHT - 550) / 2;
+
+    if (resumeButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, resumeButtonTex);
+        drawQuad(dialogX + 90, dialogY + 50, 120, 50, 0);
+    }
+
+    if (saveButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, saveButtonTex);
+        drawQuad(dialogX + 90, dialogY + 150, 120, 50, 0);
+    }
+
+    if (saveAndPlayButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, saveAndPlayButtonTex);
+        drawQuad(dialogX + 90, dialogY + 250, 120, 50, 0);
+    }
+
+    if (saveAndExitButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, saveAndExitButtonTex);
+        drawQuad(dialogX + 90, dialogY + 350, 120, 50, 0);
+    }
+
+    if (exitButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, exitButtonTex);
+        drawQuad(dialogX + 90, dialogY + 450, 120, 50, 0);
+    }
+
+    // Восстанавливаем предыдущие настройки blending
+    if (!blendEnabled) {
+        glDisable(GL_BLEND);
+    }
+    glBlendFunc(blendSrc, blendDst);
+}
+
+void renderMenu() {
+    glColor3f(1, 1, 1);
+    if (menuBackgroundTex) {
+        glBindTexture(GL_TEXTURE_2D, menuBackgroundTex);
+        drawQuad(0, 0, WIDTH, HEIGHT, 0);
+    }
+
+    if (titleTex) {
+        glBindTexture(GL_TEXTURE_2D, titleTex);
+        drawQuad((WIDTH - 200) / 2, 50, 200, 150, 0);
+    }
+    if (playTex) {
+        glBindTexture(GL_TEXTURE_2D, playTex);
+        drawQuad((WIDTH - 200) / 2, 400, 200, 50, 0);
+    }
+    if (levelsTex) {
+        glBindTexture(GL_TEXTURE_2D, levelsTex);
+        drawQuad((WIDTH - 200) / 2, 500, 200, 50, 0);
+    }
+    if (exitTex) {
+        glBindTexture(GL_TEXTURE_2D, exitTex);
+        drawQuad((WIDTH - 200) / 2, 600, 200, 50, 0);
+    }
+}
+
+void renderLevelsMenu() {
+    glColor3f(1, 1, 1);
+    if (menuBackgroundTex) {
+        glBindTexture(GL_TEXTURE_2D, menuBackgroundTex);
+        drawQuad(0, 0, WIDTH, HEIGHT, 0);
+    }
+
+    glDisable(GL_TEXTURE_2D);
+    glRasterPos2i((WIDTH - 225) / 2, 260);
+    for (char* c = "Enter the name of the level:"; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+    glEnable(GL_TEXTURE_2D);
+
+    // Поле ввода названия уровня
+    if (inputFieldTex) {
+        glBindTexture(GL_TEXTURE_2D, inputFieldTex);
+        drawQuad((WIDTH - 400) / 2, 275, 400, 100, 0);
+    }
+
+    // Отображение введённого текста
+    glDisable(GL_TEXTURE_2D);
+    glRasterPos2i((WIDTH - 355) / 2, 335);
+    for (char* c = levelName; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+    glEnable(GL_TEXTURE_2D);
+
+    // Кнопки
+    float buttonY = 400;
+    float buttonSpacing = 100;
+
+    if (createButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, createButtonTex);
+        drawQuad((WIDTH - 200) / 2, buttonY, 200, 50, 0); // Editor
+    }
+
+    if (loadTex) {
+        glBindTexture(GL_TEXTURE_2D, loadTex);
+        drawQuad((WIDTH - 200) / 2, buttonY + buttonSpacing, 200, 50, 0); // Load
+    }
+
+    if (cancelButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, cancelButtonTex);
+        drawQuad((WIDTH - 200) / 2, buttonY + buttonSpacing * 2, 200, 50, 0); // cancel
+    }
+}
+
+void renderGameOver(int score) {  // Добавляем параметр score для отображения
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (gameOverBackgroundTex) {
+        glBindTexture(GL_TEXTURE_2D, gameOverBackgroundTex);
+        drawQuad(0, 0, WIDTH, HEIGHT, 0);
+    }
+
+    // Отрисовка Game Over (центрируем)
+    if (gameOverTex) {
+        glBindTexture(GL_TEXTURE_2D, gameOverTex);
+        drawQuad((WIDTH - 600) / 2, 100, 600, 200, 0);  // Увеличиваем размер текстуры
+    }
+
+    // Кнопка Restart (центрируем)
+    if (restartTex) {
+        glBindTexture(GL_TEXTURE_2D, restartTex);
+        drawQuad((WIDTH - 200) / 2, 400, 200, 50, 0);  // Поднимаем выше
+    }
+
+    // Кнопка Menu (центрируем)
+    if (menuTex) {
+        glBindTexture(GL_TEXTURE_2D, menuTex);
+        drawQuad((WIDTH - 200) / 2, 500, 200, 50, 0);  // Поднимаем выше
+    }
+
+    // Отображение счета (добавляем)
+    char scoreText[50];
+    snprintf(scoreText, sizeof(scoreText), "Final Score: %d", score);
+
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glRasterPos2i((WIDTH - 200) / 2, 350);  // Позиция под надписью Game Over
+
+    for (char* c = scoreText; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+    glEnable(GL_TEXTURE_2D);
+}
+
+void renderMenuConfirm() {
+    // Сохраняем текущие настройки blending
+    GLboolean blendEnabled;
+    glGetBooleanv(GL_BLEND, &blendEnabled);
+    GLint blendSrc, blendDst;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrc);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDst);
+
+    // Включаем blending с правильными параметрами для полупрозрачности
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Полупрозрачный темный фон
+    glDisable(GL_TEXTURE_2D);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(WIDTH, 0);
+    glVertex2i(WIDTH, HEIGHT);
+    glVertex2i(0, HEIGHT);
+    glEnd();
+    glEnable(GL_TEXTURE_2D);
+    glColor3f(1, 1, 1); // Восстанавливаем белый цвет для текстур
+
+    // Окно подтверждения (центрированное)
+    int confirmWidth = 500;
+    int confirmHeight = 300;
+    if (dialogWindowTex) {
+        glBindTexture(GL_TEXTURE_2D, dialogWindowTex);
+        drawQuad((WIDTH - confirmWidth) / 2, (HEIGHT - confirmHeight) / 2, confirmWidth, confirmHeight, 0);
+    }
+
+    // Текст вопроса
+    if (menuPromptTex) {
+        glBindTexture(GL_TEXTURE_2D, menuPromptTex);
+        drawQuad((WIDTH - 400) / 2, (HEIGHT - confirmHeight) / 2 + 50, 400, 100, 0);
+    }
+
+    // Кнопка Да
+    if (yesButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, yesButtonTex);
+        drawQuad((WIDTH - confirmWidth) / 2 + 100, (HEIGHT - confirmHeight) / 2 + 180, 120, 50, 0);
+    }
+
+    // Кнопка Нет
+    if (noButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, noButtonTex);
+        drawQuad((WIDTH - confirmWidth) / 2 + 280, (HEIGHT - confirmHeight) / 2 + 180, 120, 50, 0);
+    }
+
+    // Восстанавливаем предыдущие настройки blending
+    if (!blendEnabled) {
+        glDisable(GL_BLEND);
+    }
+    glBlendFunc(blendSrc, blendDst);
+}
+
+void renderAlligators(Alligator* alligators) {
+    for (int i = 0; i < ALLIGATOR_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+        if (!alligators[i].isActive) continue;
+
+        float segmentWidth = GAME_WIDTH / CELLS_X;
+        int segments = (int)(alligators[i].width / segmentWidth);
+        float x = alligators[i].x;
+        int flipX = (alligators[i].direction == 1);
+
+        // Рисуем хвост (всегда первый сегмент)
+        glBindTexture(GL_TEXTURE_2D, alligatorTailTex);
+        drawQuad(x, alligators[i].y, segmentWidth, HEIGHT / CELLS_Y, flipX);
+        x += segmentWidth;
+
+        // Рисуем тело (если есть)
+        if (segments >= 3) {
+            glBindTexture(GL_TEXTURE_2D, alligatorBodyTex);
+            for (int j = 0; j < segments - 2; j++) {
+                drawQuad(x, alligators[i].y, segmentWidth, HEIGHT / CELLS_Y, flipX);
+                x += segmentWidth;
+            }
+        }
+
+        // Рисуем голову с анимацией
+        GLuint headTex = alligators[i].mouthProgress > 0.5f ?
+            alligatorHeadOpenTex : alligatorHeadClosedTex;
+        glBindTexture(GL_TEXTURE_2D, headTex);
+        drawQuad(x, alligators[i].y, segmentWidth, HEIGHT / CELLS_Y, flipX);
+
+        // Отладочная отрисовка хитбоксов
+        if (showHitboxes) {
+            // Основной хитбокс (зеленый)
+            drawHitbox(alligators[i].x, alligators[i].y,
+                alligators[i].width, HEIGHT / CELLS_Y,
+                alligators[i].hitbox);
+
+            // Хитбокс головы (красный)
+            glColor4f(1.0f, 0.0f, 0.0f, 0.3f);
+            drawHitbox(alligators[i].x, alligators[i].y,
+                alligators[i].width, HEIGHT / CELLS_Y,
+                alligators[i].headHitbox);
+            glColor3f(1.0f, 1.0f, 1.0f);
+        }
+    }
+}
+
+void renderGame(float x, float y, int lives, int score,
+    Car* cars, Log* logs, Alligator* alligators, Turtle* turtles, Home* homes, Lawnmower* lawnmower, Lawnmower* lawnmower2, Snake* snake)
+{
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glColor3f(1, 1, 1);
+
+    // Отрисовка фона
+    if (backgroundTex) {
+        glBindTexture(GL_TEXTURE_2D, backgroundTex);
+        drawQuad(0, 0, GAME_WIDTH, HEIGHT, 0);
+    }
+    if (waterTex) {
+        glBindTexture(GL_TEXTURE_2D, waterTex);
+        for (int row = 0; row < 6; row++) {
+            for (int col = 0; col < CELLS_X; col++) {
+                drawQuad(col * (GAME_WIDTH / CELLS_X), row * (HEIGHT / CELLS_Y), GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, 0);
+            }
+        }
+    }
+
+    if (groundTex) {
+        glBindTexture(GL_TEXTURE_2D, groundTex);
+        for (int col = 0; col < CELLS_X; col++) {
+            drawQuad(col * (GAME_WIDTH / CELLS_X), 6 * (HEIGHT / CELLS_Y),
+                GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, 0);
+        }
+        for (int col = 0; col < CELLS_X; col++) {
+            drawQuad(col * (GAME_WIDTH / CELLS_X), 14 * (HEIGHT / CELLS_Y),
+                GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, 0);
+        }
+    }
+
+    if (lawnTex) {
+        glBindTexture(GL_TEXTURE_2D, lawnTex);
+        for (int i = 7; i < 9; i++) {
+            for (int col = 0; col < CELLS_X; col++) {
+                drawQuad(col * (GAME_WIDTH / CELLS_X), i * (HEIGHT / CELLS_Y),
+                    GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, 0);
+            }
+        }
+    }
+
+    if (roadTex) {
+        glBindTexture(GL_TEXTURE_2D, roadTex);
+        for (int row = 9; row < 14; row++) {
+            for (int col = 0; col < CELLS_X; col++) {
+                drawQuad(col * (GAME_WIDTH / CELLS_X), row * (HEIGHT / CELLS_Y),
+                    GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, 0);
+            }
+        }
+    }
+
+
+    if (0) {
+        // Отрисовка сетки
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(0.0f, 0.0f, 0.0f);
+        glLineWidth(2.0f);
+
+        // Вертикальные линии
+        for (int i = 0; i <= CELLS_X; i++) {
+            int lineX = i * GAME_WIDTH / CELLS_X;
+            glBegin(GL_LINES);
+            glVertex2i(lineX, 0);
+            glVertex2i(lineX, HEIGHT);
+            glEnd();
+        }
+
+        // Горизонтальные линии
+        for (int i = 0; i <= CELLS_Y; i++) {
+            int lineY = i * HEIGHT / CELLS_Y;
+            glBegin(GL_LINES);
+            glVertex2i(0, lineY);
+            glVertex2i(GAME_WIDTH, lineY);
+            glEnd();
+        }
+
+        glEnable(GL_TEXTURE_2D);
+        glColor3f(1, 1, 1); // Белый цвет для текстур
+    }
+
+
+    if (car1Tex || car2Tex || car3Tex || truckTex) {
+        for (int i = 0; i < CAR_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (cars[i].texture == 0) continue;
+            glBindTexture(GL_TEXTURE_2D, cars[i].texture);
+
+            if (cars[i].texture == truckTex) {
+                drawQuad(cars[i].x, cars[i].y,
+                    GAME_WIDTH / CELLS_X * 2, HEIGHT / CELLS_Y, cars[i].direction == 1);
+            }
+            else {
+                drawQuad(cars[i].x, cars[i].y,
+                    GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, cars[i].direction == 1);
+            }
+        }
+    }
+
+    if (logLTex && logMTex && logRTex) {
+        for (int i = 0; i < LOG_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (logs[i].width == 0) continue;
+            float logWidth = logs[i].width;
+            float segmentWidth = GAME_WIDTH / CELLS_X; // Ширина одного сегмента бревна
+
+            // Отрисовка бревна по частям
+            float x = logs[i].x;
+            float remainingWidth = logWidth;
+
+            // Левый конец бревна (первые 64 пикселя текстуры)
+            glBindTexture(GL_TEXTURE_2D, logLTex);
+            drawQuad(x, logs[i].y, segmentWidth + 1, HEIGHT / CELLS_Y, 0);
+            x += segmentWidth;
+            remainingWidth -= segmentWidth;
+
+
+            // Середина бревна (повторяющаяся часть)
+            glBindTexture(GL_TEXTURE_2D, logMTex);
+            while (remainingWidth > segmentWidth) {
+                drawQuad(x, logs[i].y, segmentWidth + 1, HEIGHT / CELLS_Y, 0);
+                x += segmentWidth;
+                remainingWidth -= segmentWidth;
+            }
+
+            // Правый конец бревна (если осталось место)
+            if (remainingWidth > 0) {
+                glBindTexture(GL_TEXTURE_2D, logRTex);
+                drawQuad(x, logs[i].y, remainingWidth, HEIGHT / CELLS_Y, 0);
+            }
+        }
+    }
+
+    renderAlligators(alligators);
+
+
+    if (turtle1Tex && turtle2Tex && turtle3Tex && turtle4Tex) {
+        for (int i = 0; i < TURTLE_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (turtles[i].width == 0) continue;
+            GLuint tex;
+            switch (turtles[i].state) {
+            case 0: tex = turtle1Tex; break;
+            case 1: tex = turtle2Tex; break;
+            case 2: tex = turtle3Tex; break;
+            case 3: tex = turtle4Tex; break;
+            }
+
+            glBindTexture(GL_TEXTURE_2D, tex);
+            for (int j = 0; j < turtles[i].width / (GAME_WIDTH / CELLS_X); j++) {
+                drawQuad(turtles[i].x + j * (GAME_WIDTH / CELLS_X), turtles[i].y,
+                    GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, turtles[i].direction == 1);
+            }
+        }
+    }
+
+    if (homeEmptyTex && homeFill1Tex && homeFill2Tex && homeFill3Tex && homeFullTex) {
+        for (int i = 0; i < MAX_HOMES_COUNT; i++) {
+            GLuint tex;
+            switch (homes[i].state) {
+            case 0: tex = homeEmptyTex; break;
+            case 1: tex = homeFill1Tex; break;
+            case 2: tex = homeFill2Tex; break;
+            case 3: tex = homeFill3Tex; break;
+            case 4: tex = homeFullTex; break;
+            default: tex = homeEmptyTex; break;
+            }
+            glBindTexture(GL_TEXTURE_2D, tex);
+            drawQuad(homes[i].x, homes[i].y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, 0);
+        }
+    }
+
+    // Отрисовка газонокосилки с поворотом
+    if (lawnmowerTex) {
+        glPushMatrix();
+        glTranslatef(lawnmower->x + GAME_WIDTH / CELLS_X / 2,
+            lawnmower->y + HEIGHT / CELLS_Y / 2, 0);
+
+        // Поворот только при смене ряда
+        glRotatef(lawnmower->rotationAngle, 0, 0, 1);
+
+        glTranslatef(-(lawnmower->x + GAME_WIDTH / CELLS_X / 2),
+            -(lawnmower->y + HEIGHT / CELLS_Y / 2), 0);
+
+        glBindTexture(GL_TEXTURE_2D, lawnmower->texture);
+        drawQuad(lawnmower->x, lawnmower->y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, lawnmower->direction == 1);
+
+        glPopMatrix();
+    }
+
+    // Отрисовка второй газонокосилки
+    if (lawnmowerTex && lawnmower2->isActive) {
+        glPushMatrix();
+        glTranslatef(lawnmower2->x + GAME_WIDTH / CELLS_X / 2,
+            lawnmower2->y + HEIGHT / CELLS_Y / 2, 0);
+        glRotatef(lawnmower2->rotationAngle, 0, 0, 1);
+        glTranslatef(-(lawnmower2->x + GAME_WIDTH / CELLS_X / 2),
+            -(lawnmower2->y + HEIGHT / CELLS_Y / 2), 0);
+        glBindTexture(GL_TEXTURE_2D, lawnmower2->texture);
+        drawQuad(lawnmower2->x, lawnmower2->y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, lawnmower2->direction == 1);
+        glPopMatrix();
+    }
+
+    // Отрисовка змеи
+    if (snakeTex && snake->isActive) {
+        glBindTexture(GL_TEXTURE_2D, snake->texture);
+        drawQuad(snake->x, snake->y, GAME_WIDTH / CELLS_X * 2, HEIGHT / CELLS_Y, snake->direction == 1);
+    }
+
+    // Отрисовка лягушки
+    if (frogTex) {
+        if (noclipEnabled) {
+            glColor3f(1.0f, 0.5f, 0.5f); // Розоватый оттенок в режиме noclip
+        }
+        else {
+            glColor3f(1.0f, 1.0f, 1.0f); // Нормальный цвет
+        }
+        glBindTexture(GL_TEXTURE_2D, frogTex);
+        drawQuad(x + 4, y + 4, GAME_WIDTH / CELLS_X - 8, HEIGHT / CELLS_Y - 8, 0);
+        glColor3f(1.0f, 1.0f, 1.0f); // Восстанавливаем белый цвет
+    }
+
+    if (showHitboxes) {
+        // Хитбокс лягушки
+        Hitbox frogHitbox = { .left = 0.1f, .right = 0.1f, .top = 0.1f, .bottom = 0.1f };
+        drawHitbox(x, y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, frogHitbox);
+
+        // Хитбоксы машин
+        for (int i = 0; i < CAR_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (cars[i].texture == 0) continue;
+            float width = (cars[i].texture == truckTex) ?
+                GAME_WIDTH / CELLS_X * 2 : GAME_WIDTH / CELLS_X;
+            drawHitbox(cars[i].x, cars[i].y, width, HEIGHT / CELLS_Y, cars[i].hitbox);
+        }
+
+        // Хитбоксы бревен
+        for (int i = 0; i < LOG_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (logs[i].width == 0) continue;
+            drawHitbox(logs[i].x, logs[i].y, logs[i].width, HEIGHT / CELLS_Y, logs[i].hitbox);
+        }
+
+        // Хитбоксы черепах
+        for (int i = 0; i < TURTLE_ROWS * MAX_OBSTACLES_PER_ROW; i++) {
+            if (turtles[i].width == 0) continue;
+            drawHitbox(turtles[i].x, turtles[i].y, turtles[i].width, HEIGHT / CELLS_Y, turtles[i].hitbox);
+        }
+
+        // Хитбокс газонокосилок
+        drawHitbox(lawnmower->x, lawnmower->y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, lawnmower->hitbox);
+        if (lawnmower2->isActive) {
+            drawHitbox(lawnmower2->x, lawnmower2->y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, lawnmower2->hitbox);
+        }
+
+        // Хитбокс змеи
+        if (snake->isActive) {
+            drawHitbox(snake->x, snake->y, GAME_WIDTH / CELLS_X * 2, HEIGHT / CELLS_Y, snake->hitbox);
+        }
+
+        // Хитбоксы домиков
+        for (int i = 0; i < MAX_HOMES_COUNT; i++) {
+            Hitbox homeHitbox = { .left = 0.2f, .right = 0.2f, .top = 0.2f, .bottom = 0.2f };
+            drawHitbox(homes[i].x, homes[i].y, GAME_WIDTH / CELLS_X, HEIGHT / CELLS_Y, homeHitbox);
+        }
+    }
+
+    if (infoPanelTex) {
+        glBindTexture(GL_TEXTURE_2D, infoPanelTex);
+        drawQuad(1200, 0, 400, 900, 0);
+    }
+
+    for (int i = 0; i < lives; i++) {
+        glBindTexture(GL_TEXTURE_2D, heartTex);
+        drawQuad(1250 + i * 60, 50, 50, 50, 0); // Располагаем сердца в ряд
+    }
+
+    if (noclipEnabled) {
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(1.0f, 0.0f, 0.0f); // Красный цвет для предупреждения
+        glRasterPos2i(1250, 200); // Позиция под счетом
+        char* noclipText = "NOCLIP ON";
+        for (char* c = noclipText; *c; c++) {
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+        }
+        glEnable(GL_TEXTURE_2D);
+    }
+
+    if (showHitboxes) {
+        glDisable(GL_TEXTURE_2D);
+        glColor3f(0.0f, 1.0f, 0.0f); // Зеленый цвет для хитбоксов
+        glRasterPos2i(1250, 230);      // Позиция под noclip статусом
+        char* hitboxText = "HITBOXES ON";
+        for (char* c = hitboxText; *c; c++) {
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+        }
+        glEnable(GL_TEXTURE_2D);
+    }
+
+    // Отрисовка счета
+    char scoreText[50];
+    snprintf(scoreText, sizeof(scoreText), "Score: %d", score);
+
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f); // Белый цвет текста
+    glRasterPos2i(1250, 150); // Позиция текста
+
+    for (char* c = scoreText; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+
+    char levelText[50];
+    snprintf(levelText, sizeof(levelText), "Level: %d", currentLevel);
+
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glRasterPos2i(1250, 180); // Позиция под счетом
+
+    for (char* c = levelText; *c; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    glEnable(GL_TEXTURE_2D);
+    if (menuButtonTex) {
+        glBindTexture(GL_TEXTURE_2D, menuButtonTex);
+        drawQuad(WIDTH - 60, 20, 40, 40, 0); // В правом верхнем углу инфо-панели
+    }
+}
+
+void updateObjectsForNewLevel() {
+    char levelText[50];
+    snprintf(levelText, sizeof(levelText), "LEVEL UP! Now level: %d", currentLevel);
+    printf("%s\n", levelText);
+
+    // Машины
+    for (int i = 0; i < CAR_ROWS; i++) {
+        // Количество
+        if (carStates[i].dcount > 0 && currentLevel % carStates[i].dcountLevels == 0) {
+            carsPerRow[i] += carStates[i].dcount;
+            if (carsPerRow[i] > MAX_OBSTACLES_PER_ROW) {
+                carsPerRow[i] = MAX_OBSTACLES_PER_ROW;
+            }
+            printf("Row %d: added %d cars, now %d\n", i + 9, carStates[i].dcount, carsPerRow[i]);
+        }
+
+        // Скорость
+        if (currentLevel % carStates[i].dvLevels == 0) {
+            carSpeeds[i] += carStates[i].dv;
+            printf("Row %d: speed increased by %.1f, now %.1f\n", i + 9, carStates[i].dv, carSpeeds[i]);
+        }
+    }
+
+    // Брёвна
+    for (int i = 0; i < LOG_ROWS; i++) {
+        if (currentLevel % logStates[i].dvLevels == 0) {
+            logSpeeds[i] += logStates[i].dv;
+            printf("Log row %d: speed increased by %.1f, now %.1f\n", i, logStates[i].dv, logSpeeds[i]);
+        }
+    }
+
+    // Черепахи
+    for (int i = 0; i < TURTLE_ROWS; i++) {
+        if (currentLevel % turtleStates[i].dvLevels == 0) {
+            turtleSpeeds[i] += turtleStates[i].dv;
+            printf("Turtle row %d: speed increased by %.1f, now %.1f\n", i, turtleStates[i].dv, turtleSpeeds[i]);
+        }
+    }
+
+    // Обновляем скорость змеи
+    if (currentLevel >= 5 && currentLevel % snakeState.dvLevels == 0) {
+        snakeSpeed += snakeState.dv;
+        printf("Snake speed increased to %.1f\n", snakeSpeed);
+    }
+
+    // Обновляем скорость первой газонокосилки
+    if (currentLevel % lawnmower1State.dvLevels == 0) {
+        lawnmower1Speed += lawnmower1State.dv;
+        printf("Lawnmower 1 speed increased to %.1f\n", lawnmower1Speed);
+    }
+
+    // Обновляем скорость второй газонокосилки (если активна)
+    if (currentLevel >= 10 && currentLevel % lawnmower2State.dvLevels == 0) {
+        lawnmower2Speed += lawnmower2State.dv;
+        printf("Lawnmower 2 speed increased to %.1f\n", lawnmower2Speed);
+    }
+}
+
+void deleteAllTextures() {
+    glDeleteTextures(1, &backgroundTex);
+    glDeleteTextures(1, &titleTex);
+    glDeleteTextures(1, &playTex);
+    glDeleteTextures(1, &exitTex);
+    glDeleteTextures(1, &frogTex);
+    glDeleteTextures(1, &gameOverTex);
+    glDeleteTextures(1, &restartTex);
+    glDeleteTextures(1, &menuTex);
+    glDeleteTextures(1, &waterTex);
+    glDeleteTextures(1, &car1Tex);
+    glDeleteTextures(1, &car2Tex);
+    glDeleteTextures(1, &car3Tex);
+    glDeleteTextures(1, &car4Tex);
+    glDeleteTextures(1, &truckTex);
+    glDeleteTextures(1, &logLTex);
+    glDeleteTextures(1, &logMTex);
+    glDeleteTextures(1, &logRTex);
+    glDeleteTextures(1, &heartTex);
+    glDeleteTextures(1, &turtle1Tex);
+    glDeleteTextures(1, &turtle2Tex);
+    glDeleteTextures(1, &turtle3Tex);
+    glDeleteTextures(1, &turtle4Tex);
+    glDeleteTextures(1, &roadTex);
+    glDeleteTextures(1, &groundTex);
+    glDeleteTextures(1, &homeEmptyTex);
+    glDeleteTextures(1, &homeFill1Tex);
+    glDeleteTextures(1, &homeFill2Tex);
+    glDeleteTextures(1, &homeFill3Tex);
+    glDeleteTextures(1, &homeFullTex);
+    glDeleteTextures(1, &infoPanelTex);
+    glDeleteTextures(1, &gameOverBackgroundTex);
+    glDeleteTextures(1, &menuBackgroundTex);
+    glDeleteTextures(1, &lawnmowerTex);
+    glDeleteTextures(1, &lawnTex);
+    glDeleteTextures(1, &snakeTex);
+    glDeleteTextures(1, &dialogWindowTex);
+    glDeleteTextures(1, &yesButtonTex);
+    glDeleteTextures(1, &noButtonTex);
+    glDeleteTextures(1, &menuPromptTex);
+    glDeleteTextures(1, &menuButtonTex);
+    glDeleteTextures(1, &editorTex);
+    glDeleteTextures(1, &createButtonTex);
+    glDeleteTextures(1, &sliderBarTex);
+    glDeleteTextures(1, &sliderHandleTex);
+    glDeleteTextures(1, &cancelButtonTex);
+    glDeleteTextures(1, &alligatorHeadClosedTex);
+    glDeleteTextures(1, &alligatorHeadOpenTex);
+    glDeleteTextures(1, &alligatorBodyTex);
+    glDeleteTextures(1, &alligatorTailTex);
+    glDeleteTextures(1, &optionButtonTex);
+    glDeleteTextures(1, &deleteButtonTex);
+    glDeleteTextures(1, &grassButtonTex);
+    glDeleteTextures(1, &roadButtonTex);
+    glDeleteTextures(1, &lawnButtonTex);
+    glDeleteTextures(1, &waterButtonTex);
+    glDeleteTextures(1, &invalidPatternTex);
+}
+
+void resetParametrs() {
+    for (int i = 0; i < CAR_ROWS; i++) {
+        carSpeeds[i] = baseCarSpeeds[i];
+        carsPerRow[i] = baseCarsPerRow[i];
+    }
+    for (int i = 0; i < LOG_ROWS; i++) {
+        logSpeeds[i] = baseLogSpeeds[i];
+        logsPerRow[i] = baseLogsPerRow[i];
+    }
+    for (int i = 0; i < TURTLE_ROWS; i++) {
+        turtleSpeeds[i] = baseTurtleSpeeds[i];
+        turtlesPerRow[i] = baseTurtlesPerRow[i];
+    }
+    snakeSpeed = baseSnakeSpeed;
+    lawnmower1Speed = baseLawnmower1Speed;
+    lawnmower2Speed = baseLawnmower2Speed;
+}
+
+void spawn(float* playerX, float* playerY, float* targetX, float* targetY, int* isAnimating) {
+    *playerX = GAME_WIDTH / 2 - GAME_WIDTH / CELLS_X / 2;
+    *playerY = HEIGHT - HEIGHT / CELLS_Y;
+    *targetX = *playerX;
+    *targetY = *playerY;
+    *isAnimating = 0;
+}
+
+void restartGame(float* playerX, float* playerY, float* targetX, float* targetY, int* isAnimating,
+    int* lives, int* score, int* currentLevel, int* completedHomes, int* lastRow,
+    Car* cars, Log* logs, Alligator* alligators, Turtle* turtles, Home* homes,
+    Lawnmower* lawnmower, Lawnmower* lawnmower2, Snake* snake) {
+    // Сброс параметров игры
+    *currentLevel = 1;
+    *completedHomes = 0;
+    *score = 0;
+    *lives = 3;
+    *lastRow = CELLS_Y - 1;
+
+    // Сброс параметров игрока
+    spawn(playerX, playerY, targetX, targetY, isAnimating);
+
+    // Сброс параметров объектов к базовым значениям
+    resetParametrs();
+
+    // Переинициализация объектов
+    initCars(cars);
+    initLogs(logs);
+    initAlligators(alligators, logs);
+    initTurtles(turtles);
+    initHomes(homes);
+    initLawnmower(lawnmower, 1);
+    initLawnmower(lawnmower2, 2);
+    initSnake(snake);
+
+    Mix_HaltMusic();
+    Mix_PlayMusic(sounds.gameMusic, -1);
+}
+
+// Сброс параметров редактора
+void exitEditor() {
+    editor.zoomFactor = 1.0f;
+    editor.panX = 0;
+    editor.panY = 0;
+    editor.baseCellSize = GAME_WIDTH / 20.0f;
+    editor.isOptionsMenuOpen = 0;
+    editor.selectedZoneRow = 0;
+    editor.optionsMenuPosX = 0;
+    editor.optionsMenuPosY = 0;
+    editorMode = EDITOR_MODE_NONE;
+    selectedZone = ZONE_NONE;
+
+    // Очищаем настройки рядов
+    if (editor.rowSettings) {
+        for (int i = 0; i < editor.cellsY; i++) {
+            memset(&editor.rowSettings[i], 0, sizeof(RowSettings));
+            editor.rowSettings[i].objectType = OBJ_EMPTY;
+        }
+    }
+
+    // Очищаем зоны
+    if (editor.zoneTypes) {
+        for (int i = 0; i < editor.cellsY; i++) {
+            editor.zoneTypes[i] = ZONE_NONE;
+        }
+    }
+
+    // Сбрасываем позиции домиков и точки спавна
+    memset(homePositions, 0, sizeof(homePositions));
+    spawnX = -999;
+    spawnY = -999;
+
+    // Сбрасываем параметры редактора
+    clearEditorOptions();
+}
+
+void saveLevel(const char* filename) {
+    // Создаём JSON-объект уровня
+    cJSON* levelJson = cJSON_CreateObject();
+
+    // 1. Сохраняем базовые параметры
+    cJSON_AddNumberToObject(levelJson, "width", editor.cellsX);
+    cJSON_AddNumberToObject(levelJson, "height", editor.cellsY);
+
+    // 2. Сохраняем точку спавна
+    cJSON* spawnJson = cJSON_CreateObject();
+    cJSON_AddNumberToObject(spawnJson, "x", spawnX); // сохраняем в координатах
+    cJSON_AddNumberToObject(spawnJson, "y", spawnY);
+    cJSON_AddItemToObject(levelJson, "spawn", spawnJson);
+
+    // 3. Сохраняем домики
+    cJSON* homesJson = cJSON_CreateArray();
+    for (int i = 0; i < MAX_HOMES_COUNT; i++) {
+        if (homePositions[i].isHouseExist) {
+            cJSON* homeJson = cJSON_CreateObject();
+            cJSON_AddNumberToObject(homeJson, "x", homePositions[i].homeX);
+            cJSON_AddNumberToObject(homeJson, "y", homePositions[i].homeY);
+            cJSON_AddItemToArray(homesJson, homeJson);
+        }
+    }
+    cJSON_AddItemToObject(levelJson, "homes", homesJson);
+
+    // 4. Сохраняем зоны
+    cJSON* zonesJson = cJSON_CreateArray();
+    for (int i = 0; i < editor.cellsY; i++) {
+        const char* zoneName = "NONE";
+        switch (editor.zoneTypes[i]) {
+        case ZONE_GRASS: zoneName = "GRASS"; break;
+        case ZONE_ROAD:  zoneName = "ROAD";  break;
+        case ZONE_LAWN:  zoneName = "LAWN";  break;
+        case ZONE_WATER: zoneName = "WATER"; break;
+        }
+        cJSON_AddItemToArray(zonesJson, cJSON_CreateString(zoneName));
+    }
+    cJSON_AddItemToObject(levelJson, "zones", zonesJson);
+
+    // 5. Сохраняем настройки рядов
+    cJSON* rowsJson = cJSON_CreateArray();
+    for (int i = 0; i < editor.cellsY; i++) {
+        RowSettings* row = &editor.rowSettings[i];
+        if (row->objectType == OBJ_EMPTY) continue;
+
+        cJSON* rowJson = cJSON_CreateObject();
+        cJSON_AddNumberToObject(rowJson, "row", i); // индекс ряда
+        const char* typeName = "EMPTY";
+        switch (row->objectType) {
+        case OBJ_CAR1:      typeName = "CAR1"; break;
+        case OBJ_CAR2:      typeName = "CAR2"; break;
+        case OBJ_CAR3:      typeName = "CAR3"; break;
+        case OBJ_CAR4:      typeName = "CAR4"; break;
+        case OBJ_TRUCK:     typeName = "TRUCK"; break;
+        case OBJ_LOG:       typeName = "LOG"; break;
+        case OBJ_TURTLE:    typeName = "TURTLE"; break;
+        case OBJ_SNAKE:     typeName = "SNAKE"; break;
+        case OBJ_LAWNMOWER: typeName = "LAWNMOWER"; break;
+        }
+        printf("%d\n", row->objectType);
+        cJSON_AddStringToObject(rowJson, "type", typeName);
+        cJSON_AddNumberToObject(rowJson, "quantity", row->quantity);
+        cJSON_AddNumberToObject(rowJson, "direction", row->direction);
+        cJSON_AddNumberToObject(rowJson, "length", row->length);
+        cJSON_AddNumberToObject(rowJson, "initialSpeed1", row->initialSpeed1);
+        cJSON_AddNumberToObject(rowJson, "initialSpeed2", row->initialSpeed2);
+        cJSON_AddNumberToObject(rowJson, "speedLevels1", row->speedLevels1);
+        cJSON_AddNumberToObject(rowJson, "speedLevels2", row->speedLevels1);
+        cJSON_AddNumberToObject(rowJson, "speedIncrease1", row->speedIncrease1);
+        cJSON_AddNumberToObject(rowJson, "speedIncrease2", row->speedIncrease2);
+        cJSON_AddNumberToObject(rowJson, "countLevels", row->countLevels);
+        cJSON_AddNumberToObject(rowJson, "countIncrease", row->countIncrease);
+        cJSON_AddItemToArray(rowsJson, rowJson);
+    }
+    printf("\n");
+    cJSON_AddItemToObject(levelJson, "rows", rowsJson);
+
+    // Записываем JSON в файл
+    char* jsonStr = cJSON_Print(levelJson);
+    FILE* file = fopen(filename, "w");
+    if (file) {
+        fputs(jsonStr, file);
+        fclose(file);
+        printf("Level saved to %s\n", filename);
+    }
+    else {
+        printf("Failed to save level!\n");
+    }
+
+    // Очищаем память
+    cJSON_Delete(levelJson);
+    free(jsonStr);
+}
+
+int loadLevel(const char* filename) {
+    // 1. Читаем файл
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        printf("Failed to open level file: %s\n", filename);
+        return 0;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    char* buffer = malloc(fileSize + 1);
+    fread(buffer, 1, fileSize, file);
+    buffer[fileSize] = '\0';
+    fclose(file);
+
+    // 2. Парсим JSON
+    cJSON* levelJson = cJSON_Parse(buffer);
+    if (!levelJson) {
+        printf("Failed to parse JSON: %s\n", cJSON_GetErrorPtr());
+        free(buffer);
+        return 0;
+    }
+
+    // 3. Очищаем текущий уровень
+    exitEditor(); // Сбрасываем все настройки редактора
+
+    // 4. Загружаем базовые параметры
+    cJSON* widthJson = cJSON_GetObjectItem(levelJson, "width");
+    cJSON* heightJson = cJSON_GetObjectItem(levelJson, "height");
+    if (!widthJson || !heightJson) {
+        printf("Invalid level format: missing width/height\n");
+        cJSON_Delete(levelJson);
+        free(buffer);
+        return 0;
+    }
+
+    editor.cellsX = widthJson->valueint;
+    editor.cellsY = heightJson->valueint;
+    editor.baseCellSize = GAME_WIDTH / 20.0f; // Стандартный размер клетки
+    updateEditorTransforms();
+
+    // 5. Загружаем точку спавна
+    cJSON* spawnJson = cJSON_GetObjectItem(levelJson, "spawn");
+    if (spawnJson) {
+        cJSON* spawnXJson = cJSON_GetObjectItem(spawnJson, "x");
+        cJSON* spawnYJson = cJSON_GetObjectItem(spawnJson, "y");
+        if (spawnXJson && spawnYJson) {
+            spawnX = spawnXJson->valuedouble;
+            spawnY = spawnYJson->valuedouble;
+        }
+    }
+
+    // 6. Загружаем домики
+    cJSON* homesJson = cJSON_GetObjectItem(levelJson, "homes");
+    if (homesJson && cJSON_IsArray(homesJson)) {
+        int homeCount = cJSON_GetArraySize(homesJson);
+        for (int i = 0; i < homeCount && i < MAX_HOMES_COUNT; i++) {
+            cJSON* homeJson = cJSON_GetArrayItem(homesJson, i);
+            cJSON* homeXJson = cJSON_GetObjectItem(homeJson, "x");
+            cJSON* homeYJson = cJSON_GetObjectItem(homeJson, "y");
+            if (homeXJson && homeYJson) {
+                homePositions[i].homeX = homeXJson->valuedouble;
+                homePositions[i].homeY = homeYJson->valuedouble;
+                homePositions[i].isHouseExist = 1;
+            }
+        }
+    }
+
+    // 7. Загружаем зоны
+    cJSON* zonesJson = cJSON_GetObjectItem(levelJson, "zones");
+    if (zonesJson && cJSON_IsArray(zonesJson)) {
+        editor.zoneTypes = malloc(editor.cellsY * sizeof(int));
+        for (int i = 0; i < editor.cellsY && i < cJSON_GetArraySize(zonesJson); i++) {
+            cJSON* zoneJson = cJSON_GetArrayItem(zonesJson, i);
+            const char* zoneName = zoneJson->valuestring;
+            if (strcmp(zoneName, "GRASS") == 0) editor.zoneTypes[i] = ZONE_GRASS;
+            else if (strcmp(zoneName, "ROAD") == 0) editor.zoneTypes[i] = ZONE_ROAD;
+            else if (strcmp(zoneName, "LAWN") == 0) editor.zoneTypes[i] = ZONE_LAWN;
+            else if (strcmp(zoneName, "WATER") == 0) editor.zoneTypes[i] = ZONE_WATER;
+            else editor.zoneTypes[i] = ZONE_NONE;
+        }
+    }
+
+    // 8. Загружаем настройки рядов
+    cJSON* rowsJson = cJSON_GetObjectItem(levelJson, "rows");
+    if (rowsJson && cJSON_IsArray(rowsJson)) {
+        editor.rowSettings = malloc(editor.cellsY * sizeof(RowSettings));
+        memset(editor.rowSettings, 0, editor.cellsY * sizeof(RowSettings));
+
+        for (int i = 0; i < editor.cellsY && i < cJSON_GetArraySize(rowsJson); i++) {
+            cJSON* rowJson = cJSON_GetArrayItem(rowsJson, i);
+           
+            // Получаем индекс ряда
+            cJSON* rowIndexJson = cJSON_GetObjectItem(rowJson, "row");
+            if (!rowIndexJson) continue;
+            int rowIndex = rowIndexJson->valueint;
+
+            // Проверяем валидность индекса
+            if (rowIndex < 0 || rowIndex >= editor.cellsY) continue;
+
+            RowSettings* row = &editor.rowSettings[rowIndex];
+
+            // Тип объекта
+            cJSON* typeJson = cJSON_GetObjectItem(rowJson, "type");
+            if (typeJson) {
+                const char* typeName = typeJson->valuestring;
+                if (strcmp(typeName, "CAR1") == 0) row->objectType = OBJ_CAR1;
+                else if (strcmp(typeName, "CAR2") == 0) row->objectType = OBJ_CAR2;
+                else if (strcmp(typeName, "CAR3") == 0) row->objectType = OBJ_CAR3;
+                else if (strcmp(typeName, "CAR4") == 0) row->objectType = OBJ_CAR4;
+                else if (strcmp(typeName, "TRUCK") == 0) row->objectType = OBJ_TRUCK;
+                else if (strcmp(typeName, "LOG") == 0) row->objectType = OBJ_LOG;
+                else if (strcmp(typeName, "TURTLE") == 0) row->objectType = OBJ_TURTLE;
+                else if (strcmp(typeName, "SNAKE") == 0) row->objectType = OBJ_SNAKE;
+                else if (strcmp(typeName, "LAWNMOWER") == 0) row->objectType = OBJ_LAWNMOWER;
+                else row->objectType = OBJ_EMPTY;
+            }
+
+            // Параметры
+            cJSON* quantityJson = cJSON_GetObjectItem(rowJson, "quantity");
+            if (quantityJson) row->quantity = quantityJson->valueint;
+
+            cJSON* lengthJson = cJSON_GetObjectItem(rowJson, "length");
+            if (lengthJson) row->length = lengthJson->valueint;
+
+            cJSON* directionJson = cJSON_GetObjectItem(rowJson, "direction");
+            if (directionJson) row->direction = directionJson->valueint;
+
+            // Скорости
+            cJSON* speed1Json = cJSON_GetObjectItem(rowJson, "initialSpeed1");
+            if (speed1Json) row->initialSpeed1 = speed1Json->valuedouble;
+
+            cJSON* speed2Json = cJSON_GetObjectItem(rowJson, "initialSpeed2");
+            if (speed2Json) row->initialSpeed2 = speed2Json->valuedouble;
+
+            // Уровни для повышения скорости
+            cJSON* speedLevels1Json = cJSON_GetObjectItem(rowJson, "speedLevels1");
+            if (speedLevels1Json) row->speedLevels1 = speedLevels1Json->valueint;
+
+            cJSON* speedLevels2Json = cJSON_GetObjectItem(rowJson, "speedLevels2");
+            if (speedLevels2Json) row->speedLevels2 = speedLevels2Json->valueint;
+
+            // Повышение скорости
+            cJSON* speedIncrease1Json = cJSON_GetObjectItem(rowJson, "speedIncrease1");
+            if (speedIncrease1Json) row->speedIncrease1 = speedIncrease1Json->valuedouble;
+
+            cJSON* speedIncrease2Json = cJSON_GetObjectItem(rowJson, "speedIncrease2");
+            if (speedIncrease2Json) row->speedIncrease2 = speedIncrease2Json->valuedouble;
+
+            // Уровни для повышения количества
+            cJSON* countLevelsJson = cJSON_GetObjectItem(rowJson, "countLevels");
+            if (countLevelsJson) row->countLevels = countLevelsJson->valueint;
+
+            // Повышение количества
+            cJSON* countIncreaseJson = cJSON_GetObjectItem(rowJson, "countIncrease");
+            if (countIncreaseJson) row->countIncrease = countIncreaseJson->valueint;
+        }
+    }
+
+    currentLevelData.cellsX = editor.cellsX;
+    currentLevelData.cellsY = editor.cellsY;
+    currentLevelData.spawnX = spawnX;
+    currentLevelData.spawnY = spawnY;
+    memcpy(currentLevelData.homes, homePositions, sizeof(homePositions));
+
+    editor.panX = 0;
+    editor.panY = 0;
+    editor.zoomFactor = 1.0f;
+
+    // Обновляем трансформации
+    updateEditorTransforms();
+
+    // Пересчитываем смещения для центрирования
+    editor.viewOffsetX = (GAME_WIDTH - editor.fieldWidth) / 2;
+    editor.viewOffsetY = (HEIGHT - editor.fieldHeight) / 2;
+
+    // 9. Очищаем ресурсы
+    cJSON_Delete(levelJson);
+    free(buffer);
+
+    printf("Level loaded successfully: %s\n", filename);
+    return 1;
+}
+
+int deleteLevel(const char* levelName) {
+    char path[256];
+    snprintf(path, sizeof(path), "levels/%s.json", levelName);
+
+    if (!levelFileExists(levelName)) {
+        printf("Level file does not exist: %s\n", path);
+        return 0;
+    }
+
+    if (remove(path) == 0) {
+        printf("Successfully deleted level: %s\n", levelName);
+        return 1;
+    }
+    else {
+        printf("Failed to delete level: %s\n", path);
+        return 0;
+    }
+}
